@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "招聘 JD 发布助手",
+  "description": "在 Boss 直聘或脉脉发布职位页解析 JD 并自动填入必填字段，发布前保留人工确认。",
+  "version": "0.1.13",
+  "permissions": ["activeTab", "scripting", "sidePanel", "tabs"],
+  "host_permissions": [
+    "https://*.zhipin.com/*",
+    "https://*.kanzhun.com/*",
+    "https://maimai.cn/*",
+    "https://*.maimai.cn/*",
+    "https://maimai.com/*",
+    "https://*.maimai.com/*"
+  ],
+  "action": {
+    "default_title": "打开招聘 JD 发布助手"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.zhipin.com/*",
+        "https://*.kanzhun.com/*",
+        "https://maimai.cn/*",
+        "https://*.maimai.cn/*",
+        "https://maimai.com/*",
+        "https://*.maimai.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
