@@ -539,6 +539,231 @@ describe("fillBossForm", () => {
     expect(events).toEqual(["open-experience-shell", "select-experience", "open-education-shell", "select-education"]);
   });
 
+  it("clicks the outer select shell when Maimai requirement inputs are nested in input wrappers", async () => {
+    const events = [];
+    document.body.innerHTML = `
+      <section>
+        <div class="requirement-row">
+          <div><span>* 经验学历</span></div>
+          <div class="maimai-select">
+            <div class="input-wrap"><input readonly placeholder="请选择工作经验要求" /></div>
+            <i>⌄</i>
+          </div>
+          <div class="maimai-select">
+            <div class="input-wrap"><input readonly placeholder="请选择学历要求" /></div>
+            <i>⌄</i>
+          </div>
+        </div>
+        <div class="experience-popup" style="display: none"><div>3–5年</div></div>
+        <div class="education-popup" style="display: none"><div>本科及以上</div></div>
+      </section>
+    `;
+    document.querySelectorAll(".maimai-select")[0].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("open-experience-shell");
+      document.querySelector(".experience-popup").style.display = "block";
+    });
+    document.querySelectorAll(".maimai-select")[1].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("open-education-shell");
+      document.querySelector(".education-popup").style.display = "block";
+    });
+    document.querySelector(".experience-popup div").addEventListener("click", () => events.push("select-experience"));
+    document.querySelector(".education-popup div").addEventListener("click", () => events.push("select-education"));
+
+    const result = await fillRecruitingForm(
+      { experience: "3-5年", education: "本科及以上" },
+      document,
+      { platform: "maimai", settleMs: 0, fieldDelayMs: 0, optionTimeoutMs: 80, optionPollMs: 10 }
+    );
+
+    expect(result.filled).toEqual(["experience", "education"]);
+    expect(events).toEqual(["open-experience-shell", "select-experience", "open-education-shell", "select-education"]);
+  });
+
+  it("clicks the inner input wrapper first for Maimai requirement boxes", async () => {
+    const events = [];
+    document.body.innerHTML = `
+      <section>
+        <div class="requirement-row">
+          <div><span>* 经验学历</span></div>
+          <div class="maimai-select">
+            <div class="input-wrap"><input readonly placeholder="请选择工作经验要求" /></div>
+            <i>⌄</i>
+          </div>
+          <div class="maimai-select">
+            <div class="input-wrap"><input readonly placeholder="请选择学历要求" /></div>
+            <i>⌄</i>
+          </div>
+        </div>
+        <div class="experience-popup" style="display: none"><div>3–5年</div></div>
+        <div class="education-popup" style="display: none"><div>本科及以上</div></div>
+      </section>
+    `;
+    document.querySelectorAll(".input-wrap")[0].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("open-experience-inner");
+      document.querySelector(".experience-popup").style.display = "block";
+    });
+    document.querySelectorAll(".input-wrap")[1].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("open-education-inner");
+      document.querySelector(".education-popup").style.display = "block";
+    });
+    document.querySelectorAll(".maimai-select")[0].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("wrong-experience-outer");
+    });
+    document.querySelectorAll(".maimai-select")[1].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("wrong-education-outer");
+    });
+    document.querySelector(".experience-popup div").addEventListener("click", () => events.push("select-experience"));
+    document.querySelector(".education-popup div").addEventListener("click", () => events.push("select-education"));
+
+    const result = await fillRecruitingForm(
+      { experience: "3-5年", education: "本科及以上" },
+      document,
+      { platform: "maimai", settleMs: 0, fieldDelayMs: 0, optionTimeoutMs: 80, optionPollMs: 10 }
+    );
+
+    expect(result.filled).toEqual(["experience", "education"]);
+    expect(events).toEqual(["open-experience-inner", "select-experience", "open-education-inner", "select-education"]);
+  });
+
+  it("dispatches Maimai requirement clicks to the hit-tested child inside the visual box", async () => {
+    const events = [];
+    document.body.innerHTML = `
+      <section>
+        <div class="requirement-row">
+          <div><span>* 经验学历</span></div>
+          <div class="input-wrap"><input readonly placeholder="请选择工作经验要求" /></div>
+          <div class="input-wrap"><input readonly placeholder="请选择学历要求" /></div>
+        </div>
+        <div class="experience-popup" style="display: none"><div>3–5年</div></div>
+        <div class="education-popup" style="display: none"><div>本科及以上</div></div>
+      </section>
+    `;
+    const inputs = document.querySelectorAll("input");
+    const wrappers = document.querySelectorAll(".input-wrap");
+    wrappers.forEach((wrapper, index) => {
+      wrapper.getBoundingClientRect = () => ({
+        left: index * 200,
+        top: 0,
+        width: 160,
+        height: 40,
+        right: index * 200 + 160,
+        bottom: 40
+      });
+    });
+    document.elementFromPoint = (x) => (x < 200 ? inputs[0] : inputs[1]);
+    inputs[0].addEventListener("mousedown", () => {
+      events.push("open-experience-input");
+      document.querySelector(".experience-popup").style.display = "block";
+    });
+    inputs[1].addEventListener("mousedown", () => {
+      events.push("open-education-input");
+      document.querySelector(".education-popup").style.display = "block";
+    });
+    document.querySelector(".experience-popup div").addEventListener("click", () => events.push("select-experience"));
+    document.querySelector(".education-popup div").addEventListener("click", () => events.push("select-education"));
+
+    const result = await fillRecruitingForm(
+      { experience: "3-5年", education: "本科及以上" },
+      document,
+      { platform: "maimai", settleMs: 0, fieldDelayMs: 0, optionTimeoutMs: 80, optionPollMs: 10 }
+    );
+
+    expect(result.filled).toEqual(["experience", "education"]);
+    expect(events).toEqual(["open-experience-input", "select-experience", "open-education-input", "select-education"]);
+  });
+
+  it("clicks unclassed Maimai requirement boxes when placeholder text is nested", async () => {
+    const events = [];
+    document.body.innerHTML = `
+      <section>
+        <div class="requirement-row">
+          <div><span>* 经验学历</span></div>
+          <div>
+            <div><span>请选择工作经验要求</span></div>
+            <i>⌄</i>
+          </div>
+          <div>
+            <div><span>请选择学历要求</span></div>
+            <i>⌄</i>
+          </div>
+        </div>
+        <div class="experience-popup" style="display: none"><div>3–5年</div></div>
+        <div class="education-popup" style="display: none"><div>本科及以上</div></div>
+      </section>
+    `;
+    const boxes = document.querySelectorAll(".requirement-row > div");
+    boxes[1].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("open-experience-box");
+      document.querySelector(".experience-popup").style.display = "block";
+    });
+    boxes[2].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("open-education-box");
+      document.querySelector(".education-popup").style.display = "block";
+    });
+    document.querySelector(".experience-popup div").addEventListener("click", () => events.push("select-experience"));
+    document.querySelector(".education-popup div").addEventListener("click", () => events.push("select-education"));
+
+    const result = await fillRecruitingForm(
+      { experience: "3-5年", education: "本科及以上" },
+      document,
+      { platform: "maimai", settleMs: 0, fieldDelayMs: 0, optionTimeoutMs: 80, optionPollMs: 10 }
+    );
+
+    expect(result.filled).toEqual(["experience", "education"]);
+    expect(events).toEqual(["open-experience-box", "select-experience", "open-education-box", "select-education"]);
+  });
+
+  it("tries ancestor boxes when the initially matched Maimai requirement element does not open", async () => {
+    const events = [];
+    document.body.innerHTML = `
+      <section>
+        <div class="requirement-row">
+          <div><span>* 经验学历</span></div>
+          <div>
+            <div role="button">请选择工作经验要求</div>
+            <i>⌄</i>
+          </div>
+          <div>
+            <div role="button">请选择学历要求</div>
+            <i>⌄</i>
+          </div>
+        </div>
+        <div class="experience-popup" style="display: none"><div>3–5年</div></div>
+        <div class="education-popup" style="display: none"><div>本科及以上</div></div>
+      </section>
+    `;
+    const boxes = document.querySelectorAll(".requirement-row > div");
+    boxes[1].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("open-experience-box");
+      document.querySelector(".experience-popup").style.display = "block";
+    });
+    boxes[2].addEventListener("mousedown", (event) => {
+      if (event.target !== event.currentTarget) return;
+      events.push("open-education-box");
+      document.querySelector(".education-popup").style.display = "block";
+    });
+    document.querySelector(".experience-popup div").addEventListener("click", () => events.push("select-experience"));
+    document.querySelector(".education-popup div").addEventListener("click", () => events.push("select-education"));
+
+    const result = await fillRecruitingForm(
+      { experience: "3-5年", education: "本科及以上" },
+      document,
+      { platform: "maimai", settleMs: 0, fieldDelayMs: 0, optionTimeoutMs: 80, optionPollMs: 10 }
+    );
+
+    expect(result.filled).toEqual(["experience", "education"]);
+    expect(events).toEqual(["open-experience-box", "select-experience", "open-education-box", "select-education"]);
+  });
+
   it("promotes unclassed readonly requirement inputs to their visual boxes", async () => {
     const events = [];
     document.body.innerHTML = `

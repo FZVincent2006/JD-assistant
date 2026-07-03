@@ -150,22 +150,56 @@ async function selectMaimaiValue(labels, value, root, options = {}, selectOption
   const targets = uniqueElements(preferLabel ? [labelTarget, textTarget] : [textTarget, labelTarget]);
 
   for (const target of targets) {
-    target.dataset.recruitingAssistantValue = value;
-    clickElement(target);
+    const clickAttempts = placeholder ? getClickAttempts(target, root) : [target];
+    for (const clickTarget of clickAttempts) {
+      clickTarget.dataset.recruitingAssistantValue = value;
+      clickElement(clickTarget);
 
-    let option = await waitForPopupOption(value, root, options);
-    if (!option) {
-      pressOpenKey(target);
-      option = await waitForPopupOption(value, root, options);
-    }
-    if (option && option !== target) {
-      clickElement(option);
-      await delay(options.settleMs ?? 120);
-      return true;
+      let option = await waitForPopupOption(value, root, options);
+      if (!option) {
+        pressOpenKey(clickTarget);
+        option = await waitForPopupOption(value, root, options);
+      }
+      if (option && option !== clickTarget) {
+        clickElement(option);
+        await delay(options.settleMs ?? 120);
+        return true;
+      }
     }
   }
 
   return !placeholder;
+}
+
+function getClickAttempts(target, root) {
+  const attempts = [target];
+  const targetText = getClickableText(target);
+  let node = target.parentElement;
+
+  while (node && node !== root.body) {
+    if (isVisible(node) && isLikelySameFieldBox(node, targetText)) {
+      attempts.push(node);
+    }
+    if (normalizeLabel(getText(node)).includes("经验学历")) break;
+    node = node.parentElement;
+  }
+
+  return uniqueElements(attempts);
+}
+
+function getClickableText(element) {
+  const directText = element.getAttribute?.("placeholder") || element.value || getText(element);
+  const nestedInput = element.querySelector?.("input[placeholder],input[value]");
+  const nestedText = nestedInput?.getAttribute("placeholder") || nestedInput?.value || "";
+  return `${directText} ${nestedText}`.trim();
+}
+
+function isLikelySameFieldBox(element, targetText) {
+  if (element.tagName !== "DIV") return false;
+  const text = `${getText(element)} ${getClickableText(element)}`.trim();
+  if (!targetText || !text.includes(targetText)) return false;
+  if (normalizeLabel(text).includes("经验学历")) return false;
+  return true;
 }
 
 function pressOpenKey(target) {
@@ -338,17 +372,7 @@ function toClickableSurface(element, root) {
     if (visualBox) return visualBox;
   }
 
-  const selector = [
-    "[role='button']",
-    "button",
-    "[aria-haspopup]",
-    "[aria-expanded]",
-    "[class*='select']",
-    "[class*='Select']",
-    "[class*='picker']",
-    "[class*='Picker']"
-  ].join(",");
-  const closest = element.closest?.(selector);
+  const closest = element.closest?.(SELECT_SHELL_SELECTOR);
   if (closest && closest !== element.ownerDocument.body) return closest;
   if (isNativeClickable(element)) return element;
 
@@ -360,6 +384,17 @@ function toClickableSurface(element, root) {
 
   return element;
 }
+
+const SELECT_SHELL_SELECTOR = [
+    "[role='button']",
+    "button",
+    "[aria-haspopup]",
+    "[aria-expanded]",
+    "[class*='select']",
+    "[class*='Select']",
+    "[class*='picker']",
+    "[class*='Picker']"
+  ].join(",");
 
 function isReadonlySelectInput(element) {
   return (
@@ -432,20 +467,29 @@ function clickElement(target) {
   const rect = target.getBoundingClientRect?.();
   const clientX = rect ? rect.left + rect.width / 2 : 0;
   const clientY = rect ? rect.top + rect.height / 2 : 0;
+  const eventTarget = findEventTargetAtPoint(target, clientX, clientY);
+  eventTarget.dataset.bossAssistantSelected = "true";
+  eventTarget.dataset.recruitingAssistantSelected = "true";
   const targetWindow = target.ownerDocument.defaultView ?? window;
   const eventOptions = { bubbles: true, cancelable: true, clientX, clientY };
   const PointerEventConstructor = targetWindow.PointerEvent;
   const MouseEventConstructor = targetWindow.MouseEvent ?? MouseEvent;
 
   if (PointerEventConstructor) {
-    target.dispatchEvent(new PointerEventConstructor("pointerdown", eventOptions));
+    eventTarget.dispatchEvent(new PointerEventConstructor("pointerdown", eventOptions));
   }
-  target.dispatchEvent(new MouseEventConstructor("mousedown", eventOptions));
+  eventTarget.dispatchEvent(new MouseEventConstructor("mousedown", eventOptions));
   if (PointerEventConstructor) {
-    target.dispatchEvent(new PointerEventConstructor("pointerup", eventOptions));
+    eventTarget.dispatchEvent(new PointerEventConstructor("pointerup", eventOptions));
   }
-  target.dispatchEvent(new MouseEventConstructor("mouseup", eventOptions));
-  target.dispatchEvent(new MouseEventConstructor("click", eventOptions));
+  eventTarget.dispatchEvent(new MouseEventConstructor("mouseup", eventOptions));
+  eventTarget.dispatchEvent(new MouseEventConstructor("click", eventOptions));
+}
+
+function findEventTargetAtPoint(target, clientX, clientY) {
+  const hit = target.ownerDocument.elementFromPoint?.(clientX, clientY);
+  if (hit && (hit === target || target.contains(hit))) return hit;
+  return target;
 }
 
 function focusWithoutScrolling(target) {
