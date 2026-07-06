@@ -3,7 +3,7 @@
   "name": "招聘 JD 发布助手",
   "description": "在 Boss 直聘或脉脉发布职位页解析 JD 并自动填入必填字段，发布前保留人工确认。",
   "version": "0.1.13",
-  "permissions": ["activeTab", "scripting", "sidePanel", "tabs"],
+  "permissions": ["activeTab", "scripting", "sidePanel", "tabs", "webNavigation"],
   "host_permissions": [
     "https://*.zhipin.com/*",
     "https://*.kanzhun.com/*",
@@ -33,7 +33,8 @@
         "https://*.maimai.com/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ]
 }

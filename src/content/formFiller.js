@@ -12,32 +12,39 @@ const REQUIRED_FIELDS = new Set(["recruitmentType", "title", "description", "loc
 
 export async function fillRecruitingForm(data, root = document, options = {}) {
   const platform = options.platform ?? detectPlatform(root);
-  const result = platform === "maimai" ? await fillMaimaiForm(data, root, options) : fillBossForm(data, root);
+  const result = platform === "maimai" ? await fillMaimaiForm(data, root, options) : await fillBossForm(data, root, options);
 
   return { platform, ...result };
 }
 
-export function fillBossForm(data, root = document) {
+export async function fillBossForm(data, root = document, options = {}) {
   const filled = [];
   const missing = [];
 
   const actions = {
-    recruitmentType: () => clickByText(data.recruitmentType, root),
-    title: () => setControlValue(findTextControl(["职位名称", "岗位名称"], "input", root), data.title),
+    recruitmentType: () => selectBossRecruitmentType(data.recruitmentType, root),
+    title: () => setControlValue(findTextControl(["职位名称", "岗位名称"], "input", root), formatMaimaiTitle(data)),
     description: () => setControlValue(findTextControl(["职位描述", "岗位描述"], "textarea", root), data.description),
-    experience: () => setControlValue(findTextControl(["经验", "经验要求"], "input,select", root), data.experience),
-    education: () => setControlValue(findTextControl(["学历", "最低学历"], "input,select", root), data.education),
-    salary: () => fillSalary(data, root),
+    experience: () => fillBossDropdownOrInput(["经验", "经验要求"], data.experience, root, options, {
+      placeholder: "请选择经验要求",
+      controlIndex: 0
+    }),
+    education: () => fillBossDropdownOrInput(["学历", "最低学历"], mapBossEducation(data.education), root, options, {
+      placeholder: "请选择最低学历",
+      controlIndex: 0
+    }),
+    salary: () => fillBossSalary(data, root, options),
     keywords: () => {
       const value = Array.isArray(data.keywords) ? data.keywords.join("、") : data.keywords;
       return setControlValue(findTextControl(["职位关键词", "关键词"], "input,textarea", root), value);
     },
-    location: () => setControlValue(findTextControl(["工作地址", "职位地址"], "input", root), data.location)
+    location: () => setControlValue(findTextControl(["工作地址", "职位地址"], "input", root), formatBossLocation(data.location)),
+    jobAttribute: () => clickByText("境内岗位", root)
   };
 
-  for (const field of FIELD_ORDER) {
-    if (field !== "salary" && isEmpty(data[field])) {
-      if (REQUIRED_FIELDS.has(field)) missing.push(field);
+  for (const field of [...FIELD_ORDER, "jobAttribute"]) {
+    if (field !== "salary" && field !== "jobAttribute" && isEmpty(data[field])) {
+      if (field !== "jobAttribute" && REQUIRED_FIELDS.has(field)) missing.push(field);
       continue;
     }
 
@@ -45,14 +52,49 @@ export function fillBossForm(data, root = document) {
       continue;
     }
 
-    if (actions[field]()) {
+    if (await actions[field]()) {
       filled.push(field);
-    } else {
+    } else if (field !== "jobAttribute") {
       missing.push(field);
     }
   }
 
   return { filled, missing };
+}
+
+async function fillBossDropdownOrInput(labels, value, root, options = {}, selectOptions = {}) {
+  if (!value) return false;
+  const editable = findTextControl(labels, "input,select", root);
+  if (editable && isEditableControl(editable)) {
+    return setControlValue(editable, value);
+  }
+
+  return selectMaimaiValue(labels, value, root, options, {
+    ...selectOptions,
+    preferLabel: true
+  });
+}
+
+async function fillBossSalary(data, root, options = {}) {
+  if (!data.salaryMinK && !data.salaryMaxK) return false;
+  if (fillSalary(data, root)) return true;
+
+  const minDone = data.salaryMinK
+    ? await selectMaimaiValue(["薪资范围", "最低月薪", "最低薪资"], `${data.salaryMinK}K`, root, options, {
+        placeholder: "最低月薪",
+        controlIndex: 0,
+        preferLabel: true
+      })
+    : true;
+  const maxDone = data.salaryMaxK
+    ? await selectMaimaiValue(["薪资范围", "最高月薪", "最高薪资"], `${data.salaryMaxK}K`, root, options, {
+        placeholder: "最高月薪",
+        controlIndex: 1,
+        preferLabel: true
+      })
+    : true;
+
+  return Boolean(minDone && maxDone);
 }
 
 async function fillMaimaiForm(data, root, options = {}) {
@@ -153,13 +195,7 @@ async function selectMaimaiValue(labels, value, root, options = {}, selectOption
     const clickAttempts = placeholder ? getClickAttempts(target, root) : [target];
     for (const clickTarget of clickAttempts) {
       clickTarget.dataset.recruitingAssistantValue = value;
-      clickElement(clickTarget);
-
-      let option = await waitForPopupOption(value, root, options);
-      if (!option) {
-        pressOpenKey(clickTarget);
-        option = await waitForPopupOption(value, root, options);
-      }
+      let option = await openAndWaitForOption(clickTarget, value, root, options, { rightRetry: Boolean(placeholder) });
       if (option && option !== clickTarget) {
         clickElement(option);
         await delay(options.settleMs ?? 120);
@@ -171,20 +207,55 @@ async function selectMaimaiValue(labels, value, root, options = {}, selectOption
   return !placeholder;
 }
 
+async function openAndWaitForOption(target, value, root, options, openOptions = {}) {
+  clickElement(target);
+  let option = await waitForPopupOption(value, root, options);
+  if (option) return option;
+
+  pressOpenKey(target);
+  option = await waitForPopupOption(value, root, options);
+  if (option) return option;
+
+  if (!openOptions.rightRetry) return null;
+  clickElement(target, { xRatio: 0.88 });
+  return waitForPopupOption(value, root, options);
+}
+
 function getClickAttempts(target, root) {
   const attempts = [target];
+  attempts.push(...findNestedClickTargets(target));
   const targetText = getClickableText(target);
   let node = target.parentElement;
 
   while (node && node !== root.body) {
     if (isVisible(node) && isLikelySameFieldBox(node, targetText)) {
       attempts.push(node);
+      attempts.push(...findNestedClickTargets(node));
+      attempts.push(...findInnerClickTargets(node, target));
     }
     if (normalizeLabel(getText(node)).includes("经验学历")) break;
     node = node.parentElement;
   }
 
   return uniqueElements(attempts);
+}
+
+function findNestedClickTargets(container) {
+  return all(container, "input,button,[role='button'],[aria-haspopup],[aria-expanded]").filter((element) => {
+    if (!isVisible(element)) return false;
+    if (element === container) return false;
+    return true;
+  });
+}
+
+function findInnerClickTargets(container, originalTarget) {
+  return all(container, "i,svg,use,path,span").filter((element) => {
+    if (!isVisible(element)) return false;
+    if (element === originalTarget || element.contains(originalTarget)) return false;
+    const text = normalizeLabel(getText(element));
+    if (["经验", "学历", "薪资范围", "工作地址", "职位关键词", "职位亮点"].includes(text)) return false;
+    return true;
+  });
 }
 
 function getClickableText(element) {
@@ -247,10 +318,24 @@ async function waitForPopupOptions(value, root, options = {}) {
   while (Date.now() - startedAt <= timeoutMs) {
     const optionsFound = findPopupOptions(value, root);
     if (optionsFound.length > 0) return optionsFound;
+    scrollPopupContainers(root);
     await delay(pollMs);
   }
 
   return [];
+}
+
+function scrollPopupContainers(root) {
+  const containers = all(root, "div,ul,ol").filter((element) => {
+    if (!isVisible(element)) return false;
+    const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+    return /(auto|scroll)/.test(`${style?.overflow ?? ""} ${style?.overflowY ?? ""}`);
+  });
+
+  for (const container of containers) {
+    container.scrollTop = (container.scrollTop ?? 0) + Math.max(container.clientHeight || 120, 120);
+    container.dispatchEvent(new Event("scroll", { bubbles: true }));
+  }
 }
 
 function findPopupOptions(value, root) {
@@ -261,11 +346,27 @@ function findPopupOptions(value, root) {
   );
 
   return candidates.filter((element) => {
-    if (!isVisible(element)) return false;
+    if (!isVisiblePopupOption(element)) return false;
     const text = normalizeOptionText(getText(element));
     if (text !== wanted) return false;
     return !all(element, "*").some((child) => normalizeOptionText(getText(child)) === wanted);
   });
+}
+
+function isVisiblePopupOption(element) {
+  if (!isVisible(element)) return false;
+  if (element.classList?.contains("ui-select-item")) {
+    const select = element.closest(".ui-select");
+    if (select && !select.classList.contains("ui-select-visible")) return false;
+  }
+  const rect = element.getBoundingClientRect?.();
+  if (!rect) return true;
+  if (rect.width > 0 && rect.height > 0) return true;
+
+  const userAgent = element.ownerDocument.defaultView?.navigator?.userAgent ?? "";
+  const isJsdom = /jsdom/i.test(userAgent);
+  if (isJsdom && !Object.hasOwn(element, "getBoundingClientRect")) return true;
+  return false;
 }
 
 function normalizeOptionText(value) {
@@ -404,11 +505,22 @@ function isReadonlySelectInput(element) {
   );
 }
 
+function isEditableControl(element) {
+  if (element.closest?.(".ui-select")) return false;
+  return (
+    ["INPUT", "SELECT", "TEXTAREA"].includes(element.tagName) &&
+    !element.readOnly &&
+    !element.hasAttribute("readonly") &&
+    !element.disabled &&
+    !/^请选择/.test(element.getAttribute("placeholder") ?? "")
+  );
+}
+
 function findVisualInputBox(element, root) {
   let node = element.parentElement;
   while (node && node !== root.body) {
     const inputs = all(node, "input");
-    if (node.tagName === "DIV" && inputs.length === 1 && inputs[0] === element) return node;
+    if (node.tagName === "DIV" && inputs.length === 1 && inputs[0] === element && getText(node) === "") return node;
     node = node.parentElement;
   }
 
@@ -438,11 +550,38 @@ function formatMaimaiTitle(data) {
   return `【真格被投-${data.companyName}】${data.title}`;
 }
 
+function mapBossEducation(value) {
+  const normalized = String(value ?? "");
+  if (/博士/.test(normalized)) return "博士";
+  if (/硕士|研究生/.test(normalized)) return "硕士";
+  if (/本科/.test(normalized)) return "本科";
+  if (/大专|专科/.test(normalized)) return "大专";
+  if (/不限/.test(normalized)) return "不限";
+  return normalized;
+}
+
+function formatBossLocation(value) {
+  if (!value) return "";
+  if (/市$/.test(value)) return value;
+  return `${value}${value}市`;
+}
+
 function valueForField(data, field) {
   if (field === "keywords") return data.keywords;
   if (field === "jobCategory") return data.jobType;
   if (field === "highlights") return data.highlights;
   return data[field];
+}
+
+function selectBossRecruitmentType(value, root) {
+  if (!value) return false;
+  if (clickByText(value, root) || clickAnyExactText(value, root)) return true;
+  return normalizeOptionText(value) === "社招全职" && isBossPublishForm(root);
+}
+
+function isBossPublishForm(root) {
+  const text = root.body?.textContent ?? "";
+  return /职位基本信息|职位发布成功后|招聘类型|职位要求/.test(text);
 }
 
 function normalizeLabel(text) {
@@ -459,13 +598,25 @@ function clickByText(text, root) {
   return true;
 }
 
-function clickElement(target) {
+function clickAnyExactText(text, root) {
+  const target = all(root, "button,[role='button'],label,span,div").find((element) => {
+    if (getText(element) !== text || !isVisible(element)) return false;
+    return !all(element, "*").some((child) => getText(child) === text);
+  });
+
+  if (!target) return false;
+  clickElement(target);
+  return true;
+}
+
+function clickElement(target, options = {}) {
   target.dataset.bossAssistantSelected = "true";
   target.dataset.recruitingAssistantSelected = "true";
   target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   focusWithoutScrolling(target);
   const rect = target.getBoundingClientRect?.();
-  const clientX = rect ? rect.left + rect.width / 2 : 0;
+  const xRatio = options.xRatio ?? 0.5;
+  const clientX = rect ? rect.left + rect.width * xRatio : 0;
   const clientY = rect ? rect.top + rect.height / 2 : 0;
   const eventTarget = findEventTargetAtPoint(target, clientX, clientY);
   eventTarget.dataset.bossAssistantSelected = "true";

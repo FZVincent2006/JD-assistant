@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CheckCircle2, ClipboardPaste, Send, Wand2 } from "lucide-react";
+import { Bug, CheckCircle2, ClipboardPaste, Send, Wand2 } from "lucide-react";
 import { parseJd } from "../lib/jdParser.js";
-import { sendFillRequest } from "./fillPage.js";
+import { collectClickRecording, sendDiagnosticRequest, sendFillRequest, startClickRecording } from "./fillPage.js";
 import "./styles.css";
 
 const emptyDraft = {
@@ -27,6 +27,7 @@ function App() {
   const [jdText, setJdText] = useState("");
   const [draft, setDraft] = useState(emptyDraft);
   const [status, setStatus] = useState("等待粘贴 JD");
+  const [recording, setRecording] = useState(false);
   const keywordText = useMemo(() => draft.keywords.join("、"), [draft.keywords]);
 
   function parseCurrentJd() {
@@ -45,6 +46,50 @@ function App() {
 
     const missingText = response.missing.length ? `，未找到：${response.missing.join("、")}` : "";
     setStatus(`已填入 ${response.filled.length} 个字段${missingText}`);
+  }
+
+  async function diagnoseCurrentPage() {
+    const response = await sendDiagnosticRequest();
+    if (!response?.ok) {
+      setStatus(response?.error || "诊断失败，请确认已打开招聘平台发布职位页");
+      return;
+    }
+
+    const text = JSON.stringify(response.diagnostics, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus(`诊断结果已复制：${response.diagnostics.length} 个 frame`);
+    } catch {
+      setStatus(`诊断结果生成成功，但复制失败：${text.slice(0, 120)}`);
+    }
+  }
+
+  async function startRecordingClicks() {
+    const response = await startClickRecording();
+    if (!response?.ok) {
+      setStatus(response?.error || "点击记录启动失败");
+      return;
+    }
+    setRecording(true);
+    setStatus("开始记录：请手动点击经验框、经验选项、学历框、学历选项，然后点复制点击记录。");
+  }
+
+  async function copyRecordedClicks() {
+    const response = await collectClickRecording();
+    if (!response?.ok) {
+      setStatus(response?.error || "点击记录复制失败");
+      return;
+    }
+
+    const recordings = response.responses.map(({ frameId, recording }) => ({ frameId, ...recording }));
+    const text = JSON.stringify(recordings, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      setRecording(false);
+      setStatus(`点击记录已复制：${recordings.length} 个 frame`);
+    } catch {
+      setStatus(`点击记录生成成功，但复制失败：${text.slice(0, 120)}`);
+    }
   }
 
   function updateDraft(field, value) {
@@ -126,6 +171,18 @@ function App() {
           <Send size={16} />
           填入当前页面
         </button>
+        <button className="secondary" type="button" onClick={diagnoseCurrentPage}>
+          <Bug size={16} />
+          诊断当前页面
+        </button>
+        <div className="recordGrid">
+          <button className="secondary" type="button" onClick={startRecordingClicks}>
+            开始记录点击
+          </button>
+          <button className="secondary" type="button" onClick={copyRecordedClicks} disabled={!recording}>
+            复制点击记录
+          </button>
+        </div>
       </section>
 
       <footer className="status">

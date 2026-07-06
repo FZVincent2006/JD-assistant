@@ -78,11 +78,11 @@ function splitTitle(line, fallbackCompanyName = "") {
 function extractCompanyName(lines) {
   const companyLine = lines.find(isCompanyLine);
   if (!companyLine) return "";
-  return companyLine.replace(/^(公司|公司名称|企业|企业名称)\s*[:：]\s*/, "").trim();
+  return companyLine.replace(/^(公司|公司名|公司名称|企业|企业名称)\s*[:：]\s*/, "").trim();
 }
 
 function isCompanyLine(line) {
-  return /^(公司|公司名称|企业|企业名称)\s*[:：]/.test(line);
+  return /^(公司|公司名|公司名称|企业|企业名称)\s*[:：]/.test(line);
 }
 
 function formatPortfolioTitle(titleParts) {

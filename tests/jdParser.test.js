@@ -121,6 +121,24 @@ Agent全栈工程师｜上海｜社招
     expect(result.title).toBe("【真格被投-Dotwise】Agent全栈工程师");
   });
 
+  it("extracts company name from 公司名 line and keeps the next line as title", () => {
+    const jd = `公司名：Dotwise
+设计负责人｜上海&SF｜Full Time
+
+一.工作内容
+- 定义下一代Human-Agent协作体验
+
+二.岗位要求
+- 有3年以上的UI/UX经验`;
+
+    const result = parseJd(jd);
+
+    expect(result.companyName).toBe("Dotwise");
+    expect(result.title).toBe("【真格被投-Dotwise】设计负责人");
+    expect(result.cities).toEqual(["上海", "SF"]);
+    expect(result.experience).toBe("3-5年");
+  });
+
   it("maps single lower-bound experience requirements to Maimai ranges", () => {
     const jd = `公司：ONANA Robotics
 嵌入式工程师｜上海｜Full Time
