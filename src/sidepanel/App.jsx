@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Bug, CheckCircle2, ClipboardPaste, Send, Wand2 } from "lucide-react";
 import { parseJd } from "../lib/jdParser.js";
 import { collectClickRecording, sendDiagnosticRequest, sendFillRequest, startClickRecording } from "./fillPage.js";
+import zhenfundLogo from "./assets/zhenfund-logo.png";
 import "./styles.css";
 
 const emptyDraft = {
@@ -100,10 +101,13 @@ function App() {
     <main className="shell">
       <header className="header">
         <div>
+          <img className="brandLogo" src={zhenfundLogo} alt="ZhenFund 真格基金" />
           <h1>招聘 JD 发布助手</h1>
           <p>选择平台，粘贴 JD，确认字段，然后填入当前发布页。</p>
         </div>
-        <Wand2 aria-hidden="true" />
+        <div className="brandMark" aria-hidden="true">
+          <Wand2 size={20} />
+        </div>
       </header>
 
       <section className="platformSwitch" aria-label="选择招聘平台">

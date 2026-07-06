@@ -1,6 +1,6 @@
 :root {
-  color: #1f2937;
-  background: #f6f8fb;
+  color: #3f3328;
+  background: #f4f0e9;
   font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
   font-size: 14px;
 }
@@ -11,6 +11,9 @@
 
 body {
   margin: 0;
+  background:
+    radial-gradient(circle at 20% 8%, rgba(139, 84, 36, 0.08), transparent 34%),
+    linear-gradient(180deg, #f7f3ed 0%, #eee7dc 100%);
 }
 
 button,
@@ -22,32 +25,57 @@ textarea {
 
 .shell {
   min-height: 100vh;
-  padding: 16px;
+  padding: 18px;
 }
 
 .header {
   align-items: center;
   display: flex;
   justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 2px 2px 0;
+}
+
+.brandLogo {
+  display: block;
+  height: auto;
   margin-bottom: 14px;
+  max-width: 188px;
+  width: 64%;
 }
 
 .header h1 {
+  color: #8b5424;
   font-size: 18px;
-  margin: 0 0 4px;
+  letter-spacing: 0;
+  margin: 0 0 6px;
 }
 
 .header p {
-  color: #64748b;
+  color: #8b7967;
   font-size: 12px;
   line-height: 1.5;
   margin: 0;
 }
 
-.panel {
-  background: #ffffff;
-  border: 1px solid #d9e1ec;
+.brandMark {
+  align-items: center;
+  background: #efe6d8;
+  border: 1px solid #d8c8a8;
   border-radius: 8px;
+  color: #8b5424;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  margin-left: 12px;
+  width: 38px;
+}
+
+.panel {
+  background: rgba(255, 253, 249, 0.88);
+  border: 1px solid #d8c8a8;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(73, 48, 28, 0.07);
   display: grid;
   gap: 10px;
   margin-bottom: 12px;
@@ -55,8 +83,8 @@ textarea {
 }
 
 .platformSwitch {
-  background: #e8eef8;
-  border: 1px solid #d9e1ec;
+  background: #e9e0d2;
+  border: 1px solid #d8c8a8;
   border-radius: 8px;
   display: grid;
   gap: 4px;
@@ -69,20 +97,20 @@ textarea {
   background: transparent;
   border: 0;
   border-radius: 6px;
-  color: #64748b;
+  color: #7d6c59;
   cursor: pointer;
   min-height: 36px;
 }
 
 .platformSwitch button.active {
-  background: #ffffff;
-  color: #0f172a;
+  background: #fffaf2;
+  color: #8b5424;
   font-weight: 700;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 2px 8px rgba(73, 48, 28, 0.12);
 }
 
 label {
-  color: #475569;
+  color: #6b5744;
   font-size: 12px;
   font-weight: 600;
 }
@@ -90,9 +118,10 @@ label {
 input,
 select,
 textarea {
-  border: 1px solid #cbd5e1;
+  background: #fffdf9;
+  border: 1px solid #cfbea0;
   border-radius: 6px;
-  color: #0f172a;
+  color: #34271d;
   outline: none;
   padding: 9px 10px;
   width: 100%;
@@ -101,8 +130,13 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #0ea5a4;
-  box-shadow: 0 0 0 3px rgba(14, 165, 164, 0.14);
+  border-color: #8b5424;
+  box-shadow: 0 0 0 3px rgba(139, 84, 36, 0.14);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #b4a58f;
 }
 
 textarea {
@@ -120,10 +154,10 @@ textarea {
 
 .primary {
   align-items: center;
-  background: #0ea5a4;
+  background: #8b5424;
   border: 0;
   border-radius: 6px;
-  color: white;
+  color: #fffaf2;
   cursor: pointer;
   display: inline-flex;
   gap: 8px;
@@ -132,17 +166,21 @@ textarea {
   padding: 9px 12px;
 }
 
+.primary:hover:not(:disabled) {
+  background: #76451e;
+}
+
 .primary:disabled {
-  background: #9dbec0;
+  background: #c8b89f;
   cursor: not-allowed;
 }
 
 .secondary {
   align-items: center;
-  background: #eef6f8;
-  border: 1px solid #cbd5e1;
+  background: #f5eee4;
+  border: 1px solid #d8c8a8;
   border-radius: 6px;
-  color: #0f766e;
+  color: #8b5424;
   cursor: pointer;
   display: inline-flex;
   gap: 8px;
@@ -151,8 +189,12 @@ textarea {
   padding: 9px 12px;
 }
 
+.secondary:hover:not(:disabled) {
+  background: #efe4d5;
+}
+
 .secondary:disabled {
-  color: #94a3b8;
+  color: #a79b8b;
   cursor: not-allowed;
   opacity: 0.65;
 }
@@ -175,9 +217,12 @@ textarea {
 
 .status {
   align-items: center;
-  color: #0f766e;
+  background: rgba(255, 253, 249, 0.76);
+  border: 1px solid #d8c8a8;
+  border-radius: 8px;
+  color: #8b5424;
   display: flex;
   gap: 8px;
   line-height: 1.4;
-  padding: 4px 2px;
+  padding: 10px 12px;
 }
