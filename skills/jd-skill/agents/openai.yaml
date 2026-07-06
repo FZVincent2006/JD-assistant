@@ -1,0 +1,6 @@
+interface:
+  display_name: "JD Skill"
+  short_description: "把图片 JD 整理成插件可粘贴的文字模板"
+  default_prompt: "Use $jd-skill to convert this JD image into the plugin-compatible text template."
+policy:
+  allow_implicit_invocation: true
