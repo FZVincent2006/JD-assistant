@@ -39,6 +39,9 @@ bash scripts/install-jd-skill.sh
 公司：<公司名或待补充>
 <岗位名称>｜<城市或base待定>｜<Full Time/社招/实习/待补充>
 
+公司介绍：
+- ...
+
 工作内容：
 - ...
 

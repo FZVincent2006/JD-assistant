@@ -17,6 +17,9 @@ When the user asks to parse, extract, convert, or organize a JD image, output on
 公司：<公司名或待补充>
 <岗位名称>｜<城市或base待定>｜<Full Time/社招/实习/待补充>
 
+公司介绍：
+- ...
+
 工作内容：
 - ...
 
@@ -38,6 +41,8 @@ Do not output JSON, markdown tables, scattered fields, analysis notes, confidenc
 - Infer hiring type from phrases such as `全职`, `Full Time`, `社招`, `实习`, `校招`. Prefer preserving the source wording if it is already clear.
 - Remove emoji, decorative icons, visual bullets, contact-only lines, and layout artifacts.
 - Preserve experience, education, salary, and work mode requirements inside the relevant bullet text. Do not split them into separate fields.
+- Preserve company introductions, team descriptions, and company website lines in the `公司介绍` section.
+- Treat unlabeled paragraphs before the role title as company introduction when they describe the company, team, mission, product, users, website, or funding context.
 - Never invent missing information. Use `待补充` for unknown company or hiring type, and `base待定` for unknown location.
 
 ## Section Mapping
@@ -49,8 +54,9 @@ Normalize common headings into the fixed template:
 | `你将负责`, `工作内容`, `岗位职责`, `职责`, `Responsibilities`, `What you will do` | `工作内容` |
 | `我们希望你`, `职位要求`, `任职要求`, `岗位要求`, `Requirements`, `Who you are` | `职位要求` |
 | `加分项`, `优先项`, `Bonus`, `Nice to have`, `Preferred` | `加分项` |
+| `公司介绍`, `关于我们`, `我们是谁`, `团队介绍`, `团队里的人`, `公司官网` | `公司介绍` |
 
-Company introductions such as `我们是谁`, `关于我们`, `公司介绍` are usually omitted because the plugin template has no company-introduction section. Only keep details from them if they are necessary to identify the company or role.
+Company introductions may appear before or after the JD sections, and they may be unlabeled before the role title. Always normalize them into `公司介绍`, placed after the title line and before `工作内容`.
 
 If a section is absent from the source, keep the section header and put one bullet:
 
@@ -80,6 +86,9 @@ Output:
 ```text
 公司：Dotwise
 设计负责人｜上海｜Full Time
+
+公司介绍：
+- Dotwise 正在探索一种最大化人与 Agent 交互带宽的方式
 
 工作内容：
 - 定义下一代 Human-Agent 协作体验

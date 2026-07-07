@@ -20,10 +20,13 @@ const KEYWORD_RULES = [
 
 export function parseJd(input = "") {
   const lines = normalizeLines(input);
-  const explicitCompanyName = extractCompanyName(lines);
-  const titleLine = lines.find((line) => line.trim() && !isCompanyLine(line)) ?? "";
+  const titleIndex = findTitleLineIndex(lines);
+  const explicitCompanyName = extractCompanyName(lines, titleIndex);
+  const titleLine = titleIndex >= 0 ? lines[titleIndex] : "";
   const titleParts = splitTitle(titleLine, explicitCompanyName);
-  const bodyLines = lines.slice(lines.indexOf(titleLine) + 1);
+  const bodyLines = lines
+    .map((line, index) => ({ line, beforeTitle: titleIndex >= 0 && index < titleIndex }))
+    .filter((entry, index) => index !== titleIndex && !isCompanyLine(entry.line));
   const sections = parseSections(bodyLines);
   const cities = extractCities(titleParts.location);
   const description = buildDescription(titleParts, cities, sections);
@@ -49,11 +52,18 @@ export function parseJd(input = "") {
 }
 
 function normalizeLines(input) {
-  return input
+  return normalizeCompatibilityCjk(input)
     .replace(/\r/g, "")
     .split("\n")
     .map((line) => line.replace(/^>\s?/, "").trim())
     .filter((line) => line !== "");
+}
+
+function normalizeCompatibilityCjk(input) {
+  return Array.from(input, (char) => {
+    if (/[\u2e80-\u2fdf\uf900-\ufaff]/u.test(char)) return char.normalize("NFKC");
+    return char;
+  }).join("");
 }
 
 function splitTitle(line, fallbackCompanyName = "") {
@@ -75,14 +85,38 @@ function splitTitle(line, fallbackCompanyName = "") {
   };
 }
 
-function extractCompanyName(lines) {
+function extractCompanyName(lines, titleIndex = -1) {
   const companyLine = lines.find(isCompanyLine);
-  if (!companyLine) return "";
-  return companyLine.replace(/^(公司|公司名|公司名称|企业|企业名称)\s*[:：]\s*/, "").trim();
+  if (companyLine) return companyLine.replace(/^(公司|公司名|公司名称|企业|企业名称)\s*[:：]\s*/, "").trim();
+
+  const introLines = titleIndex >= 0 ? lines.slice(0, titleIndex) : lines;
+  return extractCompanyNameFromIntro(introLines);
 }
 
 function isCompanyLine(line) {
   return /^(公司|公司名|公司名称|企业|企业名称)\s*[:：]/.test(line);
+}
+
+function extractCompanyNameFromIntro(lines) {
+  for (const line of lines) {
+    const match = line.match(/^([A-Za-z0-9\u4e00-\u9fa5][A-Za-z0-9\u4e00-\u9fa5 ._-]{1,60}?)\s*(?:是|为)(?:真格基金|一家|一个|由)/);
+    if (match) return match[1].trim();
+  }
+
+  return "";
+}
+
+function findTitleLineIndex(lines) {
+  const explicitTitleIndex = lines.findIndex((line) => isTitleLine(line));
+  if (explicitTitleIndex >= 0) return explicitTitleIndex;
+
+  return lines.findIndex((line) => line.trim() && !isCompanyLine(line) && !matchCompanyIntroLine(line));
+}
+
+function isTitleLine(line) {
+  if (isCompanyLine(line) || matchCompanyIntroLine(line)) return false;
+  const parts = line.split(/[｜|]/).map((part) => part.trim()).filter(Boolean);
+  return parts.length >= 2;
 }
 
 function formatPortfolioTitle(titleParts) {
@@ -113,6 +147,7 @@ function inferRecruitmentType(value) {
 
 function parseSections(lines) {
   const sections = {
+    companyIntro: [],
     responsibilities: [],
     requirements: [],
     bonuses: [],
@@ -120,7 +155,19 @@ function parseSections(lines) {
   };
   let current = "responsibilities";
 
-  for (const line of lines) {
+  for (const entry of lines) {
+    const line = typeof entry === "string" ? entry : entry.line;
+    if (entry.beforeTitle && !matchSectionHeading(line)) {
+      current = "companyIntro";
+    }
+
+    const companyIntro = matchCompanyIntroLine(line);
+    if (companyIntro) {
+      current = "companyIntro";
+      if (companyIntro.value) sections.companyIntro.push(companyIntro.value);
+      continue;
+    }
+
     const heading = matchSectionHeading(line);
     if (heading) {
       current = heading;
@@ -145,6 +192,20 @@ function matchSectionHeading(line) {
   return "";
 }
 
+function matchCompanyIntroLine(line) {
+  const normalized = line.replace(/\s/g, "");
+  const introMatch = line.match(/^(公司介绍|关于我们|我们是谁|团队介绍)\s*[:：]?\s*(.*)$/);
+  if (introMatch) {
+    return { value: introMatch[2].trim() };
+  }
+
+  if (/^(团队里的人|公司官网)\s*[:：]?/.test(normalized)) {
+    return { value: line };
+  }
+
+  return null;
+}
+
 function trimSections(sections) {
   return Object.fromEntries(
     Object.entries(sections).map(([key, values]) => [key, values.filter(Boolean)])
@@ -162,8 +223,10 @@ function buildDescription(titleParts, cities, sections) {
     .join("\n\n");
   const base = cities.length ? cities.join("、") : "base待定";
   const header = `${titleParts.title}｜${base}｜薪资open talk`;
+  const companyIntro = sections.companyIntro?.length ? ["公司介绍：", ...sections.companyIntro].join("\n") : "";
+  const parts = [header, companyIntro, body].filter(Boolean);
 
-  return body ? `${header}\n\n${body}` : header;
+  return parts.join("\n\n");
 }
 
 function inferExperience(text) {

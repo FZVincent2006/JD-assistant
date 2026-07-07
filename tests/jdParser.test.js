@@ -46,6 +46,7 @@ describe("parseJd", () => {
         "- 做过 Evaluation / Benchmark / Observability"
       ].join("\n"),
       sections: {
+        companyIntro: [],
         responsibilities: [
           "- 打造下一代多模态Agent Runtime",
           "- Eval, Sandbox, Memory 等核心 Infra"
@@ -156,5 +157,168 @@ Agent全栈工程师｜上海｜社招
     expect(result.title).toBe("【真格被投-ONANA Robotics】嵌入式工程师");
     expect(result.experience).toBe("3-5年");
     expect(result.education).toBe("本科及以上");
+  });
+
+  it("places company introduction after the description header when intro comes after JD sections", () => {
+    const jd = `公司：Hyperknow
+品牌实习生 Branding Intern｜北京｜Full Time
+
+工作内容：
+- 和团队一起赋予 Hyperknow 性格
+
+岗位要求：
+- 有审美，有 taste，有创意
+
+加分项：
+- 有运营公众号经验
+
+公司介绍：Hyperknow是真格基金最年轻的被投团队，一家年轻、有理想、有创造力、有好产品、已有用户基础的 startup。
+团队里的人：
+- 有非常强的 ownership 和 agency
+- 保持好奇心，学习能力强
+公司官网：https://www.hyperknow.io/`;
+
+    const result = parseJd(jd);
+
+    expect(result.description).toBe([
+      "品牌实习生 Branding Intern｜北京｜薪资open talk",
+      "",
+      "公司介绍：",
+      "Hyperknow是真格基金最年轻的被投团队，一家年轻、有理想、有创造力、有好产品、已有用户基础的 startup。",
+      "团队里的人：",
+      "- 有非常强的 ownership 和 agency",
+      "- 保持好奇心，学习能力强",
+      "公司官网：https://www.hyperknow.io/",
+      "",
+      "【岗位职责】",
+      "- 和团队一起赋予 Hyperknow 性格",
+      "",
+      "【任职要求】",
+      "- 有审美，有 taste，有创意",
+      "",
+      "【加分项】",
+      "- 有运营公众号经验"
+    ].join("\n"));
+    expect(result.sections.companyIntro).toEqual([
+      "Hyperknow是真格基金最年轻的被投团队，一家年轻、有理想、有创造力、有好产品、已有用户基础的 startup。",
+      "团队里的人：",
+      "- 有非常强的 ownership 和 agency",
+      "- 保持好奇心，学习能力强",
+      "公司官网：https://www.hyperknow.io/"
+    ]);
+  });
+
+  it("finds the title line when company introduction appears before the JD", () => {
+    const jd = `公司：Hyperknow
+关于我们
+Hyperknow是真格基金最年轻的被投团队。
+团队里的人：
+- 年轻，有活力，有理想
+公司官网：https://www.hyperknow.io/
+
+品牌实习生 Branding Intern｜北京｜Full Time
+
+工作内容：
+- 和团队一起赋予 Hyperknow 性格
+
+岗位要求：
+- 英文熟练，沟通无障碍`;
+
+    const result = parseJd(jd);
+
+    expect(result.companyName).toBe("Hyperknow");
+    expect(result.title).toBe("【真格被投-Hyperknow】品牌实习生 Branding Intern");
+    expect(result.description).toBe([
+      "品牌实习生 Branding Intern｜北京｜薪资open talk",
+      "",
+      "公司介绍：",
+      "Hyperknow是真格基金最年轻的被投团队。",
+      "团队里的人：",
+      "- 年轻，有活力，有理想",
+      "公司官网：https://www.hyperknow.io/",
+      "",
+      "【岗位职责】",
+      "- 和团队一起赋予 Hyperknow 性格",
+      "",
+      "【任职要求】",
+      "- 英文熟练，沟通无障碍"
+    ].join("\n"));
+  });
+
+  it("keeps unlabeled company introduction paragraphs before the title in company intro", () => {
+    const jd = `Hyperknow是真格基金最年轻的被投团队，一家年轻、有理想、有创造力、有好产品、已有用户基础的 startup，希望产出真正让观众、用户能够看到的内容。
+团队里的人：
+- “We don’t say ‘we can’t’ in startup” 有毅力，有决心，能够忍受失败，愿意探索未知领域，迎难而上
+- 年轻，有活力，有理想，富有热情。为推动一家 startup 成长而感到兴奋
+公司官网：https://www.hyperknow.io/
+
+品牌实习生 Branding Intern  ｜北京&remote ｜实习
+工作内容：
+- 和团队一起赋予 Hyperknow 性格
+
+职位要求：
+- 英文熟练，沟通无障碍
+
+加分项：
+- 有运营公众号、海内外社媒账号的经验`;
+
+    const result = parseJd(jd);
+
+    expect(result.companyName).toBe("Hyperknow");
+    expect(result.title).toBe("【真格被投-Hyperknow】品牌实习生 Branding Intern");
+    expect(result.description).toBe([
+      "品牌实习生 Branding Intern｜北京｜薪资open talk",
+      "",
+      "公司介绍：",
+      "Hyperknow是真格基金最年轻的被投团队，一家年轻、有理想、有创造力、有好产品、已有用户基础的 startup，希望产出真正让观众、用户能够看到的内容。",
+      "团队里的人：",
+      "- “We don’t say ‘we can’t’ in startup” 有毅力，有决心，能够忍受失败，愿意探索未知领域，迎难而上",
+      "- 年轻，有活力，有理想，富有热情。为推动一家 startup 成长而感到兴奋",
+      "公司官网：https://www.hyperknow.io/",
+      "",
+      "【岗位职责】",
+      "- 和团队一起赋予 Hyperknow 性格",
+      "",
+      "【任职要求】",
+      "- 英文熟练，沟通无障碍",
+      "",
+      "【加分项】",
+      "- 有运营公众号、海内外社媒账号的经验"
+    ].join("\n"));
+    expect(result.sections.responsibilities).toEqual(["- 和团队一起赋予 Hyperknow 性格"]);
+  });
+
+  it("infers a Chinese company name from unlabeled company introduction", () => {
+    const jd = `智子芯元是一家专注于 AI 计算加速的初创公司，正在打造面向 GPGPU、NPU 等异构芯片的 Agent 系统。
+核心团队来自清华大学、北京大学、香港中文大学等学府，且行业经验丰富。
+公司官网：https://kernelcat.cn/
+
+Agent Harness 工程师｜深圳｜社招
+核心职责
+1. Agent Runtime 维护与演进
+
+任职要求
+1. 计算机、软件工程、电子、数学等相关专业本科及以上，3 年以上系统工程经验。`;
+
+    const result = parseJd(jd);
+
+    expect(result.companyName).toBe("智子芯元");
+    expect(result.title).toBe("【真格被投-智子芯元】Agent Harness 工程师");
+    expect(result.description).toContain("智子芯元是一家专注于 AI 计算加速的初创公司");
+  });
+
+  it("normalizes compatibility Chinese characters before inferring company and title", () => {
+    const jd = `智子芯元是⼀家专注于 AI 计算加速的初创公司，正在打造⾯向 GPGPU、NPU 等异构芯⽚的 Agent 系统。
+公司官网：https://kernelcat.cn/
+
+Agent Harness ⼯程师｜深圳｜社招
+核⼼职责
+1. Agent Runtime 维护与演进`;
+
+    const result = parseJd(jd);
+
+    expect(result.companyName).toBe("智子芯元");
+    expect(result.title).toBe("【真格被投-智子芯元】Agent Harness 工程师");
+    expect(result.description).toContain("Agent Harness 工程师｜深圳｜薪资open talk");
   });
 });
