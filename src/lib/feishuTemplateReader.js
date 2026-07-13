@@ -107,8 +107,13 @@ function inspectJd(model, rootChildren, headingIndex) {
     return inspectJdCompany(model, rootChildren, start, end);
   });
   const first = companies[0];
-  const introCallout = model.blocks.get(first.introCalloutBlockId);
-  const introBulletId = (model.childrenByParent.get(introCallout.block_id) ?? [])[0];
+  const introTemplate = companies.map((company) => {
+    const callout = model.blocks.get(company.introCalloutBlockId);
+    const bulletId = (model.childrenByParent.get(callout?.block_id) ?? [])
+      .find((id) => model.blocks.get(id)?.block_type === BLOCK.BULLET);
+    return bulletId ? { callout, bulletId } : null;
+  }).find(Boolean);
+  if (!introTemplate) throw new Error("A required Feishu style template is missing");
   const firstQuote = model.blocks.get(first.jobs[0].quoteBlockId);
   const quoteChildIds = model.childrenByParent.get(firstQuote.block_id) ?? [];
   const quoteText = quoteChildIds.map((id) => model.blocks.get(id)).find((block) => block?.block_type === BLOCK.TEXT);
@@ -123,8 +128,8 @@ function inspectJd(model, rootChildren, headingIndex) {
       companyHeading: styleTemplate(model.blocks.get(first.headingBlockId)),
       subheading: styleTemplate(model.blocks.get(first.introHeadingBlockId)),
       openHeading: styleTemplate(model.blocks.get(first.openHeadingBlockId)),
-      callout: styleTemplate(introCallout),
-      introBullet: styleTemplate(model.blocks.get(introBulletId)),
+      callout: styleTemplate(introTemplate.callout),
+      introBullet: styleTemplate(model.blocks.get(introTemplate.bulletId)),
       jobTitle: styleTemplate(model.blocks.get(first.jobs[0].blockId)),
       quote: styleTemplate(firstQuote),
       quoteText: styleTemplate(quoteText),
@@ -162,10 +167,6 @@ function inspectJdCompany(model, rootChildren, start, end) {
     throw jdTemplateError("jd-intro-callout", companyName);
   }
   const introCallout = introCallouts[0];
-  const introChildren = model.childrenByParent.get(introCallout.block_id) ?? [];
-  if (!introChildren.some((id) => model.blocks.get(id)?.block_type === BLOCK.BULLET)) {
-    throw jdTemplateError("jd-intro-bullet", companyName);
-  }
 
   const jobs = [];
   for (let index = openIndex + 1; index < blocks.length; index += 1) {

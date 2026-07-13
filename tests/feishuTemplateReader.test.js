@@ -182,4 +182,25 @@ describe("Feishu recruiting document templates", () => {
     });
     expect(snapshot.templates.jd.openHeading).toMatchObject({ block_type: 3 });
   });
+
+  it("allows legacy plain-text introductions and selects a later Bullet callout as the write template", () => {
+    const mixed = structuredClone(fixture.items);
+    const firstIntro = mixed.find((block) => block.block_id === "jd-company-a-intro-bullet");
+    firstIntro.block_type = 2;
+    firstIntro.text = firstIntro.bullet;
+    delete firstIntro.bullet;
+    const secondIntro = mixed.find((block) => block.block_id === "jd-company-b-intro-bullet");
+    secondIntro.bullet.elements[0].text_run.text_element_style = { text_color: 7 };
+
+    const snapshot = inspect(mixed);
+
+    expect(snapshot.jd.companies).toHaveLength(2);
+    expect(snapshot.templates.jd.introBullet).toMatchObject({
+      block_type: 12,
+      bullet: {
+        elements: [{ text_run: { text_element_style: { text_color: 7 } } }]
+      }
+    });
+    expect(JSON.stringify(snapshot.templates.jd)).not.toContain("示例公司乙介绍正文");
+  });
 });
