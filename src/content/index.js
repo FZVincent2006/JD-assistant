@@ -1,19 +1,11 @@
 import { fillRecruitingForm } from "./formFiller.js";
 import { collectPageDiagnostics } from "./diagnostics.js";
 import { collectClickRecording, startClickRecording, stopClickRecording } from "./clickRecorder.js";
-import { handleFeishuMessage } from "./feishuMessages.js";
 
 if (!globalThis.__recruitingAssistantContentLoaded) {
   globalThis.__recruitingAssistantContentLoaded = true;
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === "FEISHU_INSPECT" || message?.type === "FEISHU_WRITE") {
-      handleFeishuMessage(message, { root: document, url: location.href })
-        .then((response) => sendResponse(response))
-        .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }));
-      return true;
-    }
-
     if (message?.type === "RECRUITING_ASSISTANT_DIAGNOSE") {
       sendResponse({ ok: true, diagnostics: collectPageDiagnostics(document) });
       return false;

@@ -250,41 +250,27 @@ describe("sendFillRequest", () => {
 });
 
 describe("Feishu document requests", () => {
-  const testUrl = "https://zhenfund.feishu.cn/wiki/LlhrwSLIvilANZk1opwcQGlUnNv?fromScene=spaceOverview";
-
-  it("inspects and writes only through the configured test-copy tab", async () => {
+  it("routes inspect and write through runtime messaging without an active Feishu tab", async () => {
     const sendMessage = vi.fn()
       .mockResolvedValueOnce({ ok: true, snapshot: { portfolioHeadingCount: 1, jdHeadingCount: 1 } })
       .mockResolvedValueOnce({ ok: true, completed: ["jd", "summary"] });
     const chromeApi = {
-      tabs: {
-        query: vi.fn().mockResolvedValue([{ id: 81, url: testUrl }]),
-        sendMessage
-      },
-      scripting: { executeScript: vi.fn() }
+      runtime: { sendMessage }
     };
 
     await expect(sendFeishuInspectRequest(chromeApi)).resolves.toMatchObject({ ok: true });
     await expect(sendFeishuWriteRequest({ companyName: "Test" }, chromeApi)).resolves.toMatchObject({ ok: true });
-    expect(sendMessage).toHaveBeenNthCalledWith(1, 81, { type: "FEISHU_INSPECT" });
-    expect(sendMessage).toHaveBeenNthCalledWith(2, 81, {
+    expect(sendMessage).toHaveBeenNthCalledWith(1, { type: "FEISHU_INSPECT" });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, {
       type: "FEISHU_WRITE",
       payload: { companyName: "Test" }
     });
   });
 
-  it("rejects the formal document before sending a message", async () => {
-    const sendMessage = vi.fn();
-    const chromeApi = {
-      tabs: {
-        query: vi.fn().mockResolvedValue([{ id: 82, url: "https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d" }]),
-        sendMessage
-      },
-      scripting: { executeScript: vi.fn() }
-    };
-    const result = await sendFeishuWriteRequest({ companyName: "Test" }, chromeApi);
+  it("returns a readable error when the background worker cannot be reached", async () => {
+    const chromeApi = { runtime: { sendMessage: vi.fn().mockRejectedValue(new Error("worker unavailable")) } };
+    const result = await sendFeishuInspectRequest(chromeApi);
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("测试副本文档");
-    expect(sendMessage).not.toHaveBeenCalled();
+    expect(result.error).toContain("无法连接飞书自动化后台");
   });
 });
