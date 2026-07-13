@@ -4,6 +4,7 @@ const RECORD_START_MESSAGE_TYPE = "RECRUITING_ASSISTANT_RECORD_START";
 const RECORD_COLLECT_MESSAGE_TYPE = "RECRUITING_ASSISTANT_RECORD_COLLECT";
 const RECEIVER_MISSING = "Receiving end does not exist";
 const SUPPORTED_URL = /^https:\/\/([^/]+\.)?(zhipin|kanzhun|maimai)\.(com|cn)\//;
+const TEST_FEISHU_DOC_PATH = "/wiki/LlhrwSLIvilANZk1opwcQGlUnNv";
 
 export async function sendFillRequest(payload, platform, chromeApi = chrome) {
   const tab = await getActiveTab(chromeApi);
@@ -38,6 +39,43 @@ export async function sendFillRequest(payload, platform, chromeApi = chrome) {
       ok: false,
       error: `无法连接到当前页面，请刷新发布页后重试。${readableError(error)}`
     };
+  }
+}
+
+export async function sendFeishuInspectRequest(chromeApi = chrome) {
+  return sendFeishuRequest({ type: "FEISHU_INSPECT" }, chromeApi);
+}
+
+export async function sendFeishuWriteRequest(payload, chromeApi = chrome) {
+  return sendFeishuRequest({ type: "FEISHU_WRITE", payload }, chromeApi);
+}
+
+async function sendFeishuRequest(message, chromeApi) {
+  const tab = await getActiveTab(chromeApi);
+  if (!tab?.id || !isTestFeishuTab(tab.url)) {
+    return { ok: false, error: "请先打开指定的飞书测试副本文档；正式文档保持只读。" };
+  }
+
+  try {
+    return await chromeApi.tabs.sendMessage(tab.id, message);
+  } catch (error) {
+    if (!isMissingReceiverError(error)) return { ok: false, error: readableError(error) };
+  }
+
+  try {
+    await injectContentScript(tab.id, chromeApi);
+    return await chromeApi.tabs.sendMessage(tab.id, message);
+  } catch (error) {
+    return { ok: false, error: `无法连接到飞书测试副本，请刷新文档后重试。${readableError(error)}` };
+  }
+}
+
+function isTestFeishuTab(url = "") {
+  try {
+    const candidate = new URL(url);
+    return candidate.origin === "https://zhenfund.feishu.cn" && candidate.pathname === TEST_FEISHU_DOC_PATH;
+  } catch {
+    return false;
   }
 }
 

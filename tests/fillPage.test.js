@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   collectClickRecording,
+  sendFeishuInspectRequest,
+  sendFeishuWriteRequest,
   sendDiagnosticRequest,
   sendFillRequest,
   startClickRecording
@@ -244,5 +246,45 @@ describe("sendFillRequest", () => {
         { frameId: 395, recording: { url: "https://www.zhipin.com/frame", logs: [{ type: "mousedown" }] } }
       ]
     });
+  });
+});
+
+describe("Feishu document requests", () => {
+  const testUrl = "https://zhenfund.feishu.cn/wiki/LlhrwSLIvilANZk1opwcQGlUnNv?fromScene=spaceOverview";
+
+  it("inspects and writes only through the configured test-copy tab", async () => {
+    const sendMessage = vi.fn()
+      .mockResolvedValueOnce({ ok: true, snapshot: { portfolioHeadingCount: 1, jdHeadingCount: 1 } })
+      .mockResolvedValueOnce({ ok: true, completed: ["jd", "summary"] });
+    const chromeApi = {
+      tabs: {
+        query: vi.fn().mockResolvedValue([{ id: 81, url: testUrl }]),
+        sendMessage
+      },
+      scripting: { executeScript: vi.fn() }
+    };
+
+    await expect(sendFeishuInspectRequest(chromeApi)).resolves.toMatchObject({ ok: true });
+    await expect(sendFeishuWriteRequest({ companyName: "Test" }, chromeApi)).resolves.toMatchObject({ ok: true });
+    expect(sendMessage).toHaveBeenNthCalledWith(1, 81, { type: "FEISHU_INSPECT" });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, 81, {
+      type: "FEISHU_WRITE",
+      payload: { companyName: "Test" }
+    });
+  });
+
+  it("rejects the formal document before sending a message", async () => {
+    const sendMessage = vi.fn();
+    const chromeApi = {
+      tabs: {
+        query: vi.fn().mockResolvedValue([{ id: 82, url: "https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d" }]),
+        sendMessage
+      },
+      scripting: { executeScript: vi.fn() }
+    };
+    const result = await sendFeishuWriteRequest({ companyName: "Test" }, chromeApi);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("测试副本文档");
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });

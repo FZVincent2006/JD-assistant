@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "build": "vite build"
+    "build": "vite build && node scripts/verify-extension-build.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
