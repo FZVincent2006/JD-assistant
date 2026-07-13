@@ -1,5 +1,6 @@
 import {
   FEISHU_APP_ID,
+  FEISHU_AUTH_MODE,
   FEISHU_SCOPES,
   FEISHU_TOKEN_URL
 } from "../lib/feishuConfig.js";
@@ -9,19 +10,19 @@ import {
   createPkcePair,
   parseOAuthCallback
 } from "../lib/feishuPkce.js";
+import { createFeishuAuthSession, FeishuAuthError } from "./feishuAuthSession.js";
+import { createFeishuNativeAuth } from "./feishuNativeAuth.js";
 
-const SESSION_KEY = "feishuAuthSession";
-const EXPIRY_SAFETY_MS = 60_000;
+export { FeishuAuthError } from "./feishuAuthSession.js";
 
-export class FeishuAuthError extends Error {
-  constructor(message, { status = 0, code = 0, logId = "" } = {}) {
-    super(message);
-    this.name = "FeishuAuthError";
-    Object.assign(this, { status, code, logId });
-  }
+export function createFeishuAuth(options = {}) {
+  const authMode = options.authMode ?? FEISHU_AUTH_MODE;
+  if (authMode === "native") return createFeishuNativeAuth(options);
+  if (authMode !== "pkce") throw new FeishuAuthError(`Unsupported Feishu auth mode: ${authMode}`);
+  return createSecretlessFeishuAuth(options);
 }
 
-export function createFeishuAuth({
+export function createSecretlessFeishuAuth({
   chromeApi = chrome,
   fetchImpl = fetch,
   appId = FEISHU_APP_ID,
@@ -29,29 +30,12 @@ export function createFeishuAuth({
   stateFactory = () => createOAuthState(cryptoApi),
   now = Date.now
 } = {}) {
-  const session = chromeApi.storage.session;
-
-  async function readValidSession() {
-    const stored = (await session.get(SESSION_KEY))[SESSION_KEY];
-    if (!stored?.accessToken || !Number.isFinite(stored.expiresAt)) return { state: "missing" };
-    if (stored.expiresAt - now() <= EXPIRY_SAFETY_MS) {
-      await session.remove(SESSION_KEY);
-      return { state: "expired" };
-    }
-    return { state: "valid", value: stored };
-  }
+  const authSession = createFeishuAuthSession({ chromeApi, now });
 
   return {
-    async status() {
-      const current = await readValidSession();
-      if (current.state === "expired") return { status: "expired" };
-      if (current.state !== "valid") return { status: "unauthorized" };
-      return {
-        status: "authorized",
-        expiresAt: current.value.expiresAt,
-        grantedScopes: [...(current.value.grantedScopes ?? [])]
-      };
-    },
+    status: authSession.status,
+    getAccessToken: authSession.getAccessToken,
+    clear: authSession.clear,
 
     async authorize() {
       if (!appId?.trim()) throw new FeishuAuthError("Feishu App ID is not configured");
@@ -64,27 +48,11 @@ export function createFeishuAuth({
       });
       const { code } = parseOAuthCallback(callbackUrl, state);
       const token = await exchangeCode({ fetchImpl, appId, code, verifier, redirectUri });
-      const expiresAt = now() + token.expires_in * 1000;
-      const grantedScopes = String(token.scope ?? "").split(/\s+/).filter(Boolean);
-      await session.set({
-        [SESSION_KEY]: {
-          accessToken: token.access_token,
-          expiresAt,
-          grantedScopes
-        }
+      return authSession.store({
+        accessToken: token.access_token,
+        expiresIn: token.expires_in,
+        scope: token.scope
       });
-      return { status: "authorized", expiresAt, grantedScopes };
-    },
-
-    async getAccessToken() {
-      const current = await readValidSession();
-      if (current.state !== "valid") throw new FeishuAuthError("Feishu authorization required");
-      return current.value.accessToken;
-    },
-
-    async clear() {
-      await session.remove(SESSION_KEY);
-      return { status: "unauthorized" };
     }
   };
 }

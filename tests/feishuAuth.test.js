@@ -36,6 +36,7 @@ describe("Feishu auth", () => {
     const auth = createFeishuAuth({
       chromeApi,
       fetchImpl,
+      authMode: "pkce",
       appId: "cli_public",
       cryptoApi: globalThis.crypto,
       stateFactory: () => "fixed-state",
@@ -65,7 +66,7 @@ describe("Feishu auth", () => {
     const chromeApi = makeChromeApi({
       stored: { accessToken: "u-private", expiresAt: 80_000, grantedScopes: ["wiki:wiki:readonly"] }
     });
-    const auth = createFeishuAuth({ chromeApi, fetchImpl: vi.fn(), appId: "cli_public", now: () => 10_000 });
+    const auth = createFeishuAuth({ chromeApi, fetchImpl: vi.fn(), appId: "cli_public", authMode: "pkce", now: () => 10_000 });
 
     const status = await auth.status();
 
@@ -78,7 +79,7 @@ describe("Feishu auth", () => {
     const chromeApi = makeChromeApi({
       stored: { accessToken: "u-expired", expiresAt: 10_500, grantedScopes: [] }
     });
-    const auth = createFeishuAuth({ chromeApi, fetchImpl: vi.fn(), appId: "cli_public", now: () => 10_000 });
+    const auth = createFeishuAuth({ chromeApi, fetchImpl: vi.fn(), appId: "cli_public", authMode: "pkce", now: () => 10_000 });
 
     await expect(auth.status()).resolves.toEqual({ status: "expired" });
     expect(chromeApi.storage.session.remove).toHaveBeenCalledWith("feishuAuthSession");
@@ -98,6 +99,7 @@ describe("Feishu auth", () => {
     const auth = createFeishuAuth({
       chromeApi,
       fetchImpl,
+      authMode: "pkce",
       appId: "cli_public",
       stateFactory: () => "fixed-state"
     });
