@@ -7,10 +7,12 @@ import { draft, successfulSnapshots } from "./helpers/feishuWriteScenario.js";
 function writerSetup({ snapshots, request } = {}) {
   const values = snapshots ?? successfulSnapshots();
   values.initial.documentId = "doc-test";
+  values.unnumberedJd.documentId = "doc-test";
   values.jd.documentId = "doc-test";
   values.complete.documentId = "doc-test";
   const inspect = vi.fn()
     .mockResolvedValueOnce(values.initial)
+    .mockResolvedValueOnce(values.unnumberedJd)
     .mockResolvedValueOnce(values.jd)
     .mockResolvedValueOnce(values.complete);
   const client = { request: request ?? vi.fn().mockResolvedValue({}) };
@@ -25,7 +27,7 @@ function writerSetup({ snapshots, request } = {}) {
 }
 
 describe("Feishu phased OpenAPI writer", () => {
-  it("writes JD first, verifies it, then writes and verifies the summary with the fresh revision", async () => {
+  it("writes JD, enables automatic heading numbering, verifies it, then writes the summary", async () => {
     const { writer, client, inspect, wait, values } = writerSetup();
 
     const result = await writer.write(draft);
@@ -40,25 +42,68 @@ describe("Feishu phased OpenAPI writer", () => {
       companyName: draft.companyName,
       jobTitles: draft.jobs.map((job) => job.title)
     });
-    expect(client.request).toHaveBeenCalledTimes(2);
+    expect(client.request).toHaveBeenCalledTimes(3);
     expect(client.request.mock.calls[0][1]).toMatchObject({
       method: "POST",
       query: { document_revision_id: values.initial.revisionId },
       body: { index: values.plan.jdTarget.index },
       stage: "jd-write"
     });
-    expect(client.request.mock.calls[1][1]).toMatchObject({
+    expect(client.request.mock.calls[1]).toEqual([
+      "/open-apis/docx/v1/documents/doc-test/blocks/new-company-heading",
+      {
+        method: "PATCH",
+        query: { document_revision_id: values.unnumberedJd.revisionId },
+        body: {
+          update_text_style: {
+            style: { sequence: "auto" },
+            fields: [8]
+          }
+        },
+        stage: "jd-numbering"
+      }
+    ]);
+    expect(client.request.mock.calls[2][1]).toMatchObject({
       query: { document_revision_id: values.jd.revisionId },
       body: { index: values.plan.summaryTarget.index },
       stage: "summary-write"
     });
-    expect(inspect).toHaveBeenCalledTimes(3);
+    expect(inspect).toHaveBeenCalledTimes(4);
     expect(wait).toHaveBeenNthCalledWith(1, 400);
     expect(wait).toHaveBeenNthCalledWith(2, 400);
+    expect(wait).toHaveBeenNthCalledWith(3, 400);
+  });
+
+  it("stops after JD creation when Feishu rejects automatic numbering", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new FeishuApiError({
+        status: 400,
+        code: 1770001,
+        logId: "log-numbering",
+        stage: "jd-numbering",
+        message: "rejected"
+      }));
+    const { writer, inspect } = writerSetup({ request });
+
+    const result = await writer.write(draft);
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "partial",
+      completedStages: [],
+      failedStage: "jd-numbering",
+      errorCode: 1770001,
+      logId: "log-numbering"
+    });
+    expect(result.repairHint).toContain("自动编号");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(inspect).toHaveBeenCalledTimes(2);
   });
 
   it("reports JD-only partial success when summary creation fails", async () => {
     const request = vi.fn()
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce(new FeishuApiError({ status: 403, code: 99991672, logId: "log-summary", stage: "summary-write", message: "rejected" }));
     const { writer } = writerSetup({ request });
@@ -76,10 +121,29 @@ describe("Feishu phased OpenAPI writer", () => {
     expect(result.repairHint).toContain("Portfolio");
   });
 
+  it("stops before Portfolio when the numbering PATCH is accepted but remains absent on read-back", async () => {
+    const values = successfulSnapshots();
+    values.jd = structuredClone(values.unnumberedJd);
+    values.jd.revisionId += 1;
+    const { writer, client, inspect } = writerSetup({ snapshots: values });
+
+    const result = await writer.write(draft);
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "partial",
+      completedStages: [],
+      failedStage: "jd-numbering-verify"
+    });
+    expect(result.repairHint).toContain("自动编号");
+    expect(client.request).toHaveBeenCalledTimes(2);
+    expect(inspect).toHaveBeenCalledTimes(3);
+  });
+
   it("stops before summary when JD semantic verification fails", async () => {
     const values = successfulSnapshots();
-    values.jd = structuredClone(values.initial);
-    values.jd.documentId = "doc-test";
+    values.unnumberedJd = structuredClone(values.initial);
+    values.unnumberedJd.documentId = "doc-test";
     const { writer, client } = writerSetup({ snapshots: values });
 
     const result = await writer.write(draft);
@@ -113,14 +177,14 @@ describe("Feishu phased OpenAPI writer", () => {
     const result = await writer.write(draft);
 
     expect(result.ok).toBe(true);
-    expect(request).toHaveBeenCalledTimes(2);
-    expect(inspect).toHaveBeenCalledTimes(3);
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(inspect).toHaveBeenCalledTimes(4);
   });
 
   it("reports failure without retry when timeout read-back proves the JD edit is absent", async () => {
     const values = successfulSnapshots();
-    values.jd = structuredClone(values.initial);
-    values.jd.documentId = "doc-test";
+    values.unnumberedJd = structuredClone(values.initial);
+    values.unnumberedJd.documentId = "doc-test";
     const request = vi.fn().mockRejectedValue(new FeishuApiError({ status: 0, stage: "jd-write", message: "network" }));
     const { writer, inspect } = writerSetup({ snapshots: values, request });
 

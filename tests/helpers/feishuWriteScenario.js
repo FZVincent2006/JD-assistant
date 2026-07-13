@@ -34,14 +34,14 @@ export function initialSnapshot() {
 export function successfulSnapshots() {
   const initial = initialSnapshot();
   const plan = buildFeishuOpenApiPlan(initial, draft);
-  const jd = structuredClone(initial);
-  jd.revisionId += 1;
-  jd.jd.companies.unshift({
+  const unnumberedJd = structuredClone(initial);
+  unnumberedJd.revisionId += 1;
+  unnumberedJd.jd.companies.unshift({
     name: draft.companyName,
     headingBlockId: "new-company-heading",
     blockType: 3,
-    headingSequence: "auto",
-    parentBlockId: jd.rootId,
+    headingSequence: undefined,
+    parentBlockId: unnumberedJd.rootId,
     index: plan.jdTarget.index,
     endIndex: plan.jdTarget.index + 8,
     introHeadingBlockId: "new-intro-heading",
@@ -60,6 +60,10 @@ export function successfulSnapshots() {
     }))
   });
 
+  const jd = structuredClone(unnumberedJd);
+  jd.revisionId += 1;
+  jd.jd.companies[0].headingSequence = "auto";
+
   const complete = structuredClone(jd);
   complete.revisionId += 1;
   complete.portfolio.companies.unshift({
@@ -76,5 +80,5 @@ export function successfulSnapshots() {
       index: plan.summaryTarget.index + 1 + index
     }))
   });
-  return { initial, plan, jd, complete };
+  return { initial, plan, unnumberedJd, jd, complete };
 }

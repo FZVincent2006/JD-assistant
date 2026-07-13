@@ -1,7 +1,7 @@
 import { BLOCK } from "./feishuBlockModel.js";
 import { normalizeForMatch } from "./feishuOpenApiPlan.js";
 
-export function verifyJdWrite(snapshot = {}, plan = {}) {
+export function verifyJdWrite(snapshot = {}, plan = {}, { requireNumbering = true } = {}) {
   const errors = [];
   verifyRevision(snapshot, errors);
   const companies = matchingCompanies(snapshot.jd?.companies, plan.companyName);
@@ -14,7 +14,7 @@ export function verifyJdWrite(snapshot = {}, plan = {}) {
   if (company.parentBlockId !== snapshot.rootId || invalidOptionalType(company.blockType, BLOCK.HEADING1)) {
     errors.push(`公司“${plan.companyName}”必须是文档根级 Heading 1。`);
   }
-  if (plan.mode === "new-company" && company.headingSequence !== "auto") {
+  if (requireNumbering && plan.mode === "new-company" && company.headingSequence !== "auto") {
     errors.push(`公司“${plan.companyName}”的 Heading 1 未启用飞书自动编号。`);
   }
   if (plan.mode === "new-company" && company.index !== plan.jdTarget?.index) {

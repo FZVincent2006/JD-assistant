@@ -1,6 +1,6 @@
 import { renderJdDescendants, renderSummaryDescendants } from "../lib/feishuBlockRenderer.js";
 import { TEST_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
-import { buildFeishuOpenApiPlan } from "../lib/feishuOpenApiPlan.js";
+import { buildFeishuOpenApiPlan, normalizeForMatch } from "../lib/feishuOpenApiPlan.js";
 import { verifyJdWrite, verifySummaryWrite } from "../lib/feishuWriteVerifier.js";
 
 export function createFeishuOpenApiWriter({ client, inspect, wait = defaultWait }) {
@@ -106,7 +106,7 @@ async function executeWrite({ client, inspect, wait, draft }) {
         repairHint: "岗位 JD 写入请求状态未知且无法回读；不要重复提交，请先人工检查测试副本。"
       });
     }
-    const timeoutVerification = verifyJdWrite(afterJd, plan);
+    const timeoutVerification = verifyJdWrite(afterJd, plan, { requireNumbering: false });
     if (!timeoutVerification.ok) {
       return failedForError({
         draft,
@@ -119,14 +119,91 @@ async function executeWrite({ client, inspect, wait, draft }) {
     }
   }
 
-  const jdVerification = verifyJdWrite(afterJd, plan);
-  if (!jdVerification.ok) {
+  const jdContentVerification = verifyJdWrite(afterJd, plan, { requireNumbering: false });
+  if (!jdContentVerification.ok) {
     return makeResult({
       draft,
       plan,
       completedStages,
       status: "failed",
       failedStage: "jd-verify",
+      repairHint: `岗位 JD 区写入后结构校验失败：${jdContentVerification.errors.join("；")}`
+    });
+  }
+
+  let numberingAttempted = false;
+  if (plan.mode === "new-company" && !hasAutomaticHeadingNumbering(afterJd, plan.companyName)) {
+    numberingAttempted = true;
+    const company = findJdCompany(afterJd, plan.companyName);
+    if (!company?.headingBlockId) {
+      return makeResult({
+        draft,
+        plan,
+        completedStages,
+        status: "partial",
+        failedStage: "jd-numbering",
+        repairHint: "岗位 JD 内容已写入，但无法确定新公司 Heading 1 的块 ID，已停止自动编号和 Portfolio 写入。"
+      });
+    }
+
+    let numberingApiSucceeded = false;
+    try {
+      await enableAutomaticHeadingNumbering(
+        client,
+        initial.documentId,
+        company.headingBlockId,
+        afterJd.revisionId
+      );
+      numberingApiSucceeded = true;
+      await wait(400);
+      afterJd = await inspect();
+    } catch (error) {
+      if (numberingApiSucceeded) {
+        return makeResult({
+          draft,
+          plan,
+          completedStages,
+          status: "unknown",
+          failedStage: "jd-numbering-verify",
+          repairHint: "岗位 JD 内容及自动编号请求已被 API 接受，但无法回读；不要重复提交，请先人工检查测试副本。"
+        });
+      }
+      if (!isAmbiguousNetworkError(error)) {
+        return failedForError({
+          draft,
+          plan,
+          completedStages,
+          stage: "jd-numbering",
+          error,
+          status: "partial",
+          repairHint: "岗位 JD 内容已写入，但公司 Heading 1 自动编号失败；已停止 Portfolio 写入。"
+        });
+      }
+      await wait(400);
+      try {
+        afterJd = await inspect();
+      } catch {
+        return failedForError({
+          draft,
+          plan,
+          completedStages,
+          stage: "jd-numbering",
+          error,
+          status: "unknown",
+          repairHint: "公司 Heading 1 自动编号请求状态未知且无法回读；不要重复提交，请先人工检查测试副本。"
+        });
+      }
+    }
+  }
+
+  const jdVerification = verifyJdWrite(afterJd, plan);
+  if (!jdVerification.ok) {
+    return makeResult({
+      draft,
+      plan,
+      completedStages,
+      status: numberingAttempted ? "partial" : "failed",
+      failedStage: numberingAttempted ? "jd-numbering-verify" : "jd-verify",
       repairHint: `岗位 JD 区写入后结构校验失败：${jdVerification.errors.join("；")}`
     });
   }
@@ -220,6 +297,34 @@ async function createDescendants(client, documentId, target, revisionId, request
       stage
     }
   );
+}
+
+async function enableAutomaticHeadingNumbering(client, documentId, headingBlockId, revisionId) {
+  return client.request(
+    `/open-apis/docx/v1/documents/${encodeURIComponent(documentId)}/blocks/${encodeURIComponent(headingBlockId)}`,
+    {
+      method: "PATCH",
+      query: { document_revision_id: revisionId },
+      body: {
+        update_text_style: {
+          style: { sequence: "auto" },
+          fields: [8]
+        }
+      },
+      stage: "jd-numbering"
+    }
+  );
+}
+
+function findJdCompany(snapshot, companyName) {
+  const normalizedName = normalizeForMatch(companyName);
+  return (snapshot.jd?.companies ?? []).find(
+    (company) => normalizeForMatch(company.name) === normalizedName
+  );
+}
+
+function hasAutomaticHeadingNumbering(snapshot, companyName) {
+  return findJdCompany(snapshot, companyName)?.headingSequence === "auto";
 }
 
 function failedForError({
