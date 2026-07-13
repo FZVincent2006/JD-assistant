@@ -76,6 +76,30 @@ describe("executeFeishuWrite", () => {
     expect(paste).toHaveBeenCalledTimes(2);
   });
 
+  it("preserves partial-success details when the summary paste throws", async () => {
+    const paste = vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockRejectedValueOnce(new Error("浏览器拒绝执行粘贴"));
+    const result = await executeFeishuWrite(
+      { url: TEST_FEISHU_DOC_URL, draft, root: document },
+      {
+        inspect: vi.fn()
+          .mockResolvedValueOnce(emptySnapshot)
+          .mockResolvedValueOnce(snapshotWithCompany(["jd"])),
+        locate: (_root, _plan, area) => ({ area, element: document.body, position: "start" }),
+        paste
+      }
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      stage: "summary",
+      completed: ["jd"],
+      error: "岗位汇总区写入失败：浏览器拒绝执行粘贴；JD 区已成功写入，请人工检查汇总区。"
+    });
+    expect(paste).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects every document except the configured test copy", async () => {
     const inspect = vi.fn();
     const result = await executeFeishuWrite(

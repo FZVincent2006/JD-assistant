@@ -14,11 +14,16 @@ export function buildFeishuWritePlan(snapshot = {}, draft = {}) {
   const existingPortfolioJobs = portfolioMatches[0]?.jobs ?? [];
   const existingJdJobs = jdMatches[0]?.jobs ?? [];
   const existingTitles = new Set([...existingPortfolioJobs, ...existingJdJobs].map(normalizeText));
+  const draftTitles = new Set();
 
   for (const job of draft.jobs ?? []) {
-    if (existingTitles.has(normalizeText(job.title))) {
+    const title = normalizeText(job.title);
+    if (draftTitles.has(title)) {
+      errors.push(`本次输入包含重复岗位“${job.title}”，已停止写入。`);
+    } else if (existingTitles.has(title)) {
       errors.push(`岗位“${job.title}”已存在，已停止写入。`);
     }
+    draftTitles.add(title);
   }
 
   const firstOrdinal = mode === "append-jobs" ? existingJdJobs.length + 1 : 1;

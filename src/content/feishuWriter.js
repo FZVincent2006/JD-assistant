@@ -24,28 +24,37 @@ export async function executeFeishuWrite({ url, draft, root = document }, depend
   const completed = [];
 
   for (const area of ["jd", "summary"]) {
-    const target = await locate(root, plan, area, before);
-    if (!target) {
-      return {
-        ok: false,
-        stage: area,
-        completed,
-        error: insertionError(area, completed)
-      };
-    }
+    try {
+      const target = await locate(root, plan, area, before);
+      if (!target) {
+        return {
+          ok: false,
+          stage: area,
+          completed,
+          error: insertionError(area, completed)
+        };
+      }
 
-    await paste(target, fragments[area], { root });
-    await settle(area);
-    const after = await inspect(root);
-    if (!areaContainsDraft(after, draft, area)) {
+      await paste(target, fragments[area], { root });
+      await settle(area);
+      const after = await inspect(root);
+      if (!areaContainsDraft(after, draft, area)) {
+        return {
+          ok: false,
+          stage: area,
+          completed,
+          error: verificationError(area, completed)
+        };
+      }
+      completed.push(area);
+    } catch (error) {
       return {
         ok: false,
         stage: area,
         completed,
-        error: verificationError(area, completed)
+        error: operationError(area, completed, error)
       };
     }
-    completed.push(area);
   }
 
   return { ok: true, completed, mode: plan.mode, plan };
@@ -120,6 +129,14 @@ function verificationError(area, completed) {
     return "岗位汇总区写入后校验失败；JD 区已成功写入，请人工检查汇总区。";
   }
   return "JD 区写入后校验失败，已停止后续写入。";
+}
+
+function operationError(area, completed, error) {
+  const detail = error instanceof Error ? error.message : String(error ?? "未知错误");
+  if (area === "summary" && completed.includes("jd")) {
+    return `岗位汇总区写入失败：${detail}；JD 区已成功写入，请人工检查汇总区。`;
+  }
+  return `JD 区写入失败：${detail}；已停止后续写入，请人工检查 JD 区。`;
 }
 
 function normalized(value = "") {

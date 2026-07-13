@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mergeFeishuSlices } from "../src/content/feishuScanner.js";
+// @vitest-environment jsdom
+import { findFeishuInsertionTargetFully, mergeFeishuSlices } from "../src/content/feishuScanner.js";
 
 describe("mergeFeishuSlices", () => {
   it("merges virtualized company tokens across overlapping slices", () => {
@@ -89,5 +90,34 @@ describe("mergeFeishuSlices", () => {
       { name: "重复公司", jobs: [] },
       { name: "重复公司", jobs: [] }
     ]);
+  });
+});
+
+describe("findFeishuInsertionTargetFully", () => {
+  it("keeps final-company summary appends inside the summary callout", async () => {
+    document.body.innerHTML = `
+      <div class="bear-web-x-container">
+        <div class="docx-heading1-block" data-block-id="portfolio"><div contenteditable="true">Portfolio开放岗位汇总</div></div>
+        <div class="docx-callout-block" data-block-id="summary">
+          <div class="docx-heading3-block callout-render-unit" data-block-id="s1"><div contenteditable="true">最后公司</div></div>
+          <div class="docx-bullet-block callout-render-unit" data-block-id="s2"><div contenteditable="true">已有岗位｜上海｜社招</div></div>
+        </div>
+        <div class="docx-text-block" data-block-id="later"><div contenteditable="true">文档后续内容</div></div>
+      </div>`;
+    const scroll = document.querySelector(".bear-web-x-container");
+    Object.defineProperties(scroll, {
+      scrollHeight: { value: 1200 },
+      clientHeight: { value: 500 }
+    });
+
+    const target = await findFeishuInsertionTargetFully(
+      document,
+      { mode: "append-jobs", companyName: "最后公司" },
+      "summary",
+      { portfolioCompanies: [{ name: "最后公司", jobs: ["已有岗位"] }], jdCompanies: [] },
+      { settleMs: 0 }
+    );
+
+    expect(target).toMatchObject({ blockId: "s2", position: "end" });
   });
 });

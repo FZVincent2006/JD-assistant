@@ -62,7 +62,7 @@ export async function findFeishuInsertionTargetFully(root, plan, area, snapshot,
   const nextCompanyName = plan.mode === "append-jobs" && companyIndex >= 0 ? companies[companyIndex + 1]?.name : "";
   const maxTop = Math.max(0, scroll.scrollHeight - scroll.clientHeight);
 
-  if (plan.mode === "append-jobs" && companyIndex === companies.length - 1) {
+  if (area === "jd" && plan.mode === "append-jobs" && companyIndex === companies.length - 1) {
     await moveScroll(root, scroll, maxTop, settleMs);
     const lastEditableBlock = Array.from(root.querySelectorAll('[data-block-id] [contenteditable="true"]')).at(-1);
     const block = lastEditableBlock?.closest("[data-block-id]");

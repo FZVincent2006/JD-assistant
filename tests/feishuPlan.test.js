@@ -76,6 +76,14 @@ describe("buildFeishuWritePlan", () => {
     expect(buildFeishuWritePlan(inconsistent, draft).errors).toContain("公司只存在于一个目标区域，文档结构不一致。");
   });
 
+  it("stops when the same job title appears twice in one draft", () => {
+    const duplicateDraft = { ...draft, jobs: [draft.jobs[0], { ...draft.jobs[0] }] };
+    const plan = buildFeishuWritePlan(emptySnapshot(), duplicateDraft);
+
+    expect(plan.ok).toBe(false);
+    expect(plan.errors).toContain("本次输入包含重复岗位“Agent 工程师”，已停止写入。");
+  });
+
   it("requires edit access and unique target headings", () => {
     const plan = buildFeishuWritePlan(emptySnapshot({ editable: false, jdHeadingCount: 2 }), draft);
     expect(plan.ok).toBe(false);
