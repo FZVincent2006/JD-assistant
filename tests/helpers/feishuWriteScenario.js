@@ -40,6 +40,7 @@ export function successfulSnapshots() {
     name: draft.companyName,
     headingBlockId: "new-company-heading",
     blockType: 3,
+    headingSequence: "auto",
     parentBlockId: jd.rootId,
     index: plan.jdTarget.index,
     endIndex: plan.jdTarget.index + 8,

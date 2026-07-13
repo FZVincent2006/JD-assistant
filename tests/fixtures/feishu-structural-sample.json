@@ -60,7 +60,7 @@
       "block_id": "jd-company-a",
       "parent_id": "page",
       "block_type": 3,
-      "heading1": { "elements": [{ "text_run": { "content": "示例公司甲", "text_element_style": { "bold": true, "link": { "url": "https://example.com/a" } } } }], "style": { "align": 1 } },
+      "heading1": { "elements": [{ "text_run": { "content": "示例公司甲", "text_element_style": { "bold": true, "link": { "url": "https://example.com/a" } } } }], "style": { "align": 1, "sequence": "auto" } },
       "children": []
     },
     {
@@ -137,7 +137,7 @@
       "block_id": "jd-company-b",
       "parent_id": "page",
       "block_type": 3,
-      "heading1": { "elements": [{ "text_run": { "content": "示例公司乙", "text_element_style": { "bold": true } } }], "style": { "align": 1 } },
+      "heading1": { "elements": [{ "text_run": { "content": "示例公司乙", "text_element_style": { "bold": true } } }], "style": { "align": 1, "sequence": "auto" } },
       "children": []
     },
     {

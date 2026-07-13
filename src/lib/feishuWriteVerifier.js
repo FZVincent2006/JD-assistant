@@ -14,6 +14,9 @@ export function verifyJdWrite(snapshot = {}, plan = {}) {
   if (company.parentBlockId !== snapshot.rootId || invalidOptionalType(company.blockType, BLOCK.HEADING1)) {
     errors.push(`公司“${plan.companyName}”必须是文档根级 Heading 1。`);
   }
+  if (plan.mode === "new-company" && company.headingSequence !== "auto") {
+    errors.push(`公司“${plan.companyName}”的 Heading 1 未启用飞书自动编号。`);
+  }
   if (plan.mode === "new-company" && company.index !== plan.jdTarget?.index) {
     errors.push("新公司 Heading 1 不在计划位置。");
   }

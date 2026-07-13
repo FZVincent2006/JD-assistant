@@ -190,6 +190,7 @@ function inspectJdCompany(model, rootChildren, start, end) {
     name: companyName,
     headingBlockId: companyHeading.block_id,
     blockType: companyHeading.block_type,
+    headingSequence: companyHeading.heading1?.style?.sequence,
     parentBlockId: model.rootId,
     index: start,
     endIndex: end,

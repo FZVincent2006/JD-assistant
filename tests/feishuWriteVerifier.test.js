@@ -44,6 +44,16 @@ describe("Feishu persisted-write verification", () => {
     expect(verifyJdWrite(jd, plan)).toEqual({ ok: true, errors: [] });
   });
 
+  it("requires Feishu automatic numbering on a newly inserted company Heading 1", () => {
+    const { plan, jd } = successfulSnapshots();
+    jd.jd.companies[0].headingSequence = "1";
+
+    const result = verifyJdWrite(jd, plan);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join(" ")).toContain("自动编号");
+  });
+
   it("rejects wrong job counts, ordinals, title text, and root sibling positions", () => {
     const { plan, jd } = successfulSnapshots();
     jd.jd.companies[0].jobs.pop();

@@ -19,6 +19,7 @@ describe("Feishu recruiting document templates", () => {
       jobs: [{ title: "示例岗位甲", ordinal: 1 }]
     });
     expect(snapshot.jd.firstCompanyIndex).toBe(3);
+    expect(snapshot.jd.companies.map((company) => company.headingSequence)).toEqual(["auto", "auto"]);
     expect(snapshot.portfolio).toMatchObject({
       parentBlockId: "portfolio-callout",
       firstCompanyIndex: 0
