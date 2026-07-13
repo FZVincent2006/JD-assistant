@@ -164,7 +164,27 @@ describe("pasteFeishuFragment", () => {
     expect(pastedPayloads).toEqual(["New"]);
   });
 
-  it("writes the clipboard before placing the caret and invoking paste", async () => {
+  it("inserts rich HTML directly when clipboard and synthetic paste are both unavailable", async () => {
+    document.body.innerHTML = '<div contenteditable="true">Existing</div>';
+    const element = document.querySelector("div");
+    const execCommand = vi.fn((command) => command === "insertHTML");
+
+    const result = await pasteFeishuFragment(
+      { element, position: "start" },
+      { html: "<p>New</p>", text: "New" },
+      {
+        root: document,
+        writeClipboard: vi.fn().mockRejectedValue(new DOMException("Document is not focused", "NotAllowedError")),
+        dispatchPaste: vi.fn(() => false),
+        execCommand
+      }
+    );
+
+    expect(result).toBe(true);
+    expect(execCommand).toHaveBeenCalledWith("insertHTML", false, "<p>New</p>");
+  });
+
+  it("writes the clipboard before placing the caret and inserting rich HTML", async () => {
     document.body.innerHTML = '<div contenteditable="true">Existing</div>';
     const element = document.querySelector("div");
     const events = [];
@@ -178,6 +198,6 @@ describe("pasteFeishuFragment", () => {
       }
     );
     expect(result).toBe(true);
-    expect(events).toEqual(["clipboard", "paste"]);
+    expect(events).toEqual(["clipboard", "insertHTML"]);
   });
 });

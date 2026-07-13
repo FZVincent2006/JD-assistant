@@ -64,7 +64,7 @@ export async function pasteFeishuFragment(target, fragment, dependencies = {}) {
   const root = dependencies.root ?? document;
   const writeClipboard = dependencies.writeClipboard ?? ((value) => writeRichClipboard(value, root));
   const dispatchPaste = dependencies.dispatchPaste ?? ((element, value) => dispatchRichPaste(element, value, root));
-  const execCommand = dependencies.execCommand ?? ((command) => root.execCommand(command));
+  const execCommand = dependencies.execCommand ?? ((command, showUi, value) => root.execCommand(command, showUi, value));
   let clipboardError = null;
   try {
     await writeClipboard(fragment);
@@ -74,6 +74,7 @@ export async function pasteFeishuFragment(target, fragment, dependencies = {}) {
   target.element.focus();
   placeCaret(root, target.element, target.position);
   if (dispatchPaste(target.element, fragment)) return true;
+  if (execCommand("insertHTML", false, fragment.html)) return true;
   if (clipboardError) {
     const detail = clipboardError instanceof Error ? clipboardError.message : String(clipboardError);
     throw new Error(`浏览器拒绝写入系统剪贴板：${detail}`);
