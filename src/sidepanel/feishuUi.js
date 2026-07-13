@@ -20,6 +20,24 @@ export function formatFeishuWriteStatus(result) {
   return `写入失败（${phaseLabel(result?.failedStage)}）：${detail}`;
 }
 
+export function formatFeishuOperationError(response, fallback = "飞书操作失败。") {
+  if (!response) return fallback;
+  const message = response.error || fallback;
+  const diagnostics = [];
+  const stage = operationStageLabel(response.stage);
+  if (stage) diagnostics.push(stage);
+  if (Number.isFinite(response.errorCode) && response.errorCode !== 0) {
+    diagnostics.push(`错误码 ${response.errorCode}`);
+  }
+  if (Number.isFinite(response.status) && response.status !== 0) {
+    diagnostics.push(`HTTP ${response.status}`);
+  }
+  if (typeof response.logId === "string" && response.logId) {
+    diagnostics.push(`Log ID ${response.logId}`);
+  }
+  return diagnostics.length ? `${message}\n诊断：${diagnostics.join("｜")}` : message;
+}
+
 export function canWriteFeishu({ authStatus, inspection, plan, errors = [], writing = false }) {
   return authStatus === "authorized"
     && Boolean(inspection)
@@ -59,4 +77,18 @@ function phaseLabel(stage) {
     "summary-verify": "Portfolio 校验"
   };
   return labels[stage] ?? "飞书操作";
+}
+
+function operationStageLabel(stage) {
+  const labels = {
+    "authorization-required": "尚未授权",
+    "oauth-launch": "打开授权窗口",
+    "oauth-callback": "授权回调",
+    "native-exchange": "本机授权交换",
+    "auth-store": "保存授权状态",
+    "wiki-resolve": "读取 Wiki 节点",
+    "document-metadata": "读取文档信息",
+    "document-blocks-read": "读取文档内容"
+  };
+  return labels[stage] ?? (stage && stage !== "unknown" ? stage : "");
 }

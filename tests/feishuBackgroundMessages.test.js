@@ -124,4 +124,43 @@ describe("Feishu service-worker messages", () => {
       stage: "unknown"
     });
   });
+
+  it("gives safe stage-specific guidance without forwarding private error text", () => {
+    const nativeFailure = Object.assign(new Error("private native detail"), {
+      code: 20002,
+      logId: "safe-log-id",
+      stage: "native-exchange"
+    });
+
+    expect(toPublicFeishuError(nativeFailure)).toEqual({
+      ok: false,
+      error: "飞书授权交换失败，请检查本机授权助手与飞书应用凭证。",
+      errorCode: 20002,
+      status: 0,
+      logId: "safe-log-id",
+      stage: "native-exchange"
+    });
+    expect(JSON.stringify(toPublicFeishuError(nativeFailure))).not.toContain("private native detail");
+
+    expect(toPublicFeishuError(Object.assign(new Error("private token"), {
+      stage: "authorization-required"
+    })).error).toBe("尚未完成飞书授权，请先点击“授权飞书”。");
+  });
+
+  it("translates only whitelisted native authorization reasons", () => {
+    expect(toPublicFeishuError(Object.assign(
+      new Error("Feishu authorization helper is not installed"),
+      { stage: "native-exchange" }
+    )).error).toContain("Edge 未找到本机授权助手");
+
+    expect(toPublicFeishuError(Object.assign(
+      new Error("Feishu token exchange was rejected"),
+      { stage: "native-exchange", code: 20002 }
+    )).error).toContain("飞书拒绝了授权令牌交换");
+
+    expect(toPublicFeishuError(Object.assign(
+      new Error("untrusted helper output containing a secret"),
+      { stage: "native-exchange" }
+    )).error).toBe("飞书授权交换失败，请检查本机授权助手与飞书应用凭证。");
+  });
 });

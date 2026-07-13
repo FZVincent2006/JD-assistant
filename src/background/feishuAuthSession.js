@@ -2,10 +2,10 @@ const SESSION_KEY = "feishuAuthSession";
 const EXPIRY_SAFETY_MS = 60_000;
 
 export class FeishuAuthError extends Error {
-  constructor(message, { status = 0, code = 0, logId = "" } = {}) {
+  constructor(message, { status = 0, code = 0, logId = "", stage = "authorization" } = {}) {
     super(message);
     this.name = "FeishuAuthError";
-    Object.assign(this, { status, code, logId });
+    Object.assign(this, { status, code, logId, stage });
   }
 }
 
@@ -48,7 +48,11 @@ export function createFeishuAuthSession({ chromeApi, now = Date.now }) {
 
     async getAccessToken() {
       const current = await readValidSession();
-      if (current.state !== "valid") throw new FeishuAuthError("Feishu authorization required");
+      if (current.state !== "valid") {
+        throw new FeishuAuthError("Feishu authorization required", {
+          stage: "authorization-required"
+        });
+      }
       return current.value.accessToken;
     },
 

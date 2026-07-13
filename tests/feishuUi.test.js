@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canWriteFeishu,
   describeFeishuPlan,
+  formatFeishuOperationError,
   formatFeishuWriteStatus,
   updateJobDraftField
 } from "../src/sidepanel/feishuUi.js";
@@ -28,6 +29,26 @@ describe("formatFeishuWriteStatus", () => {
     expect(unknown).toContain("结果未知");
     expect(unknown).not.toContain("写入失败");
     expect(unknown).not.toContain("写入成功");
+  });
+});
+
+describe("formatFeishuOperationError", () => {
+  it("shows safe stage, error code, HTTP status, and log ID when present", () => {
+    expect(formatFeishuOperationError({
+      error: "飞书授权交换失败，请检查本机授权助手与飞书应用凭证。",
+      stage: "native-exchange",
+      errorCode: 20002,
+      status: 400,
+      logId: "safe-log"
+    }, "飞书操作失败。"))
+      .toBe("飞书授权交换失败，请检查本机授权助手与飞书应用凭证。\n诊断：本机授权交换｜错误码 20002｜HTTP 400｜Log ID safe-log");
+  });
+
+  it("omits empty diagnostics and never invents an error code", () => {
+    expect(formatFeishuOperationError({ error: "请先授权。", stage: "authorization-required" }, "失败。"))
+      .toBe("请先授权。\n诊断：尚未授权");
+    expect(formatFeishuOperationError(null, "失败。"))
+      .toBe("失败。");
   });
 });
 

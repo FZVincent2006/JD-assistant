@@ -16,6 +16,7 @@ import {
 import {
   canWriteFeishu,
   describeFeishuPlan,
+  formatFeishuOperationError,
   formatFeishuWriteStatus,
   updateJobDraftField
 } from "./feishuUi.js";
@@ -66,7 +67,7 @@ function App() {
         setAuthStatus(response.auth?.status ?? "unauthorized");
       } else {
         setAuthStatus("unauthorized");
-        setStatus(response?.error || "无法检查飞书授权状态。");
+        setStatus(formatFeishuOperationError(response, "无法检查飞书授权状态。"));
       }
     });
     return () => { current = false; };
@@ -171,7 +172,7 @@ function App() {
     const response = await sendFeishuRuntimeRequest("FEISHU_AUTHORIZE");
     if (!response?.ok) {
       setAuthStatus("unauthorized");
-      setStatus(response?.error || "飞书授权失败。");
+      setStatus(formatFeishuOperationError(response, "飞书授权失败。"));
       return;
     }
     setAuthStatus(response.auth?.status ?? "authorized");
@@ -185,7 +186,7 @@ function App() {
     setStatus("正在通过 OpenAPI 检查飞书测试副本，请稍候…");
     const response = await sendFeishuInspectRequest();
     if (!response?.ok) {
-      setStatus(response?.error || "测试副本检查失败。");
+      setStatus(formatFeishuOperationError(response, "测试副本检查失败。"));
       return;
     }
     setInspection(response.inspection);
@@ -203,7 +204,7 @@ function App() {
     const response = await sendFeishuRuntimeRequest("FEISHU_PLAN", companyDraft);
     if (!response?.ok) {
       setWritePlan(null);
-      setStatus(response?.error || "写入计划生成失败。");
+      setStatus(formatFeishuOperationError(response, "写入计划生成失败。"));
       return;
     }
     setInspection(response.inspection);

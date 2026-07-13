@@ -72,14 +72,39 @@ export function registerFeishuBackgroundMessages(chromeApi, services) {
 }
 
 export function toPublicFeishuError(error) {
+  const stage = typeof error?.stage === "string" ? error.stage : "unknown";
   return {
     ok: false,
-    error: "飞书操作失败，请根据错误码检查授权、权限或文档状态。",
+    error: publicErrorMessage(stage, error?.message),
     errorCode: Number.isFinite(error?.code) ? error.code : 0,
     status: Number.isFinite(error?.status) ? error.status : 0,
     logId: typeof error?.logId === "string" ? error.logId : "",
-    stage: typeof error?.stage === "string" ? error.stage : "unknown"
+    stage
   };
+}
+
+function publicErrorMessage(stage, internalMessage) {
+  const knownReasons = {
+    "Feishu authorization helper is not installed": "Edge 未找到本机授权助手。请完全退出并重新打开 Edge；若仍失败，请重新运行安装助手。",
+    "Feishu authorization helper failed": "Edge 启动本机授权助手失败，请完全退出并重新打开 Edge 后重试。",
+    "Feishu App Secret is not configured": "本机授权助手尚未配置飞书 App Secret，请重新运行安装助手。",
+    "Feishu token exchange was rejected": "飞书拒绝了授权令牌交换，请根据错误码检查 App Secret 与回调地址。",
+    "Feishu token response is incomplete": "飞书授权响应不完整，请根据错误码与 Log ID 检查应用配置。",
+    "OAuth state mismatch": "飞书授权回调校验失败，请关闭授权窗口后重新授权。",
+    "Feishu authorization was cancelled": "飞书授权已取消，请重新点击“授权飞书”并完成确认。"
+  };
+  if (knownReasons[internalMessage]) return knownReasons[internalMessage];
+  const messages = {
+    "authorization-required": "尚未完成飞书授权，请先点击“授权飞书”。",
+    "oauth-launch": "未能打开飞书授权窗口，请检查浏览器身份授权设置。",
+    "oauth-callback": "飞书授权回调无效或已取消，请重新授权。",
+    "native-exchange": "飞书授权交换失败，请检查本机授权助手与飞书应用凭证。",
+    "auth-store": "飞书授权已完成，但临时授权状态保存失败。",
+    "wiki-resolve": "无法读取飞书知识库节点，请检查应用权限与文档访问权限。",
+    "document-metadata": "无法读取飞书文档信息，请检查应用权限与文档状态。",
+    "document-blocks-read": "无法读取飞书文档内容，请检查应用权限与文档状态。"
+  };
+  return messages[stage] ?? "飞书操作失败，请根据错误码检查授权、权限或文档状态。";
 }
 
 function publicAuthStatus(value = {}) {

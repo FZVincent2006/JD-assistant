@@ -81,7 +81,10 @@ describe("Feishu native authorization", () => {
       stateFactory: () => "fixed-state"
     });
 
-    await expect(auth.authorize()).rejects.toThrow("authorization helper is not installed");
+    await expect(auth.authorize()).rejects.toMatchObject({
+      message: expect.stringContaining("authorization helper is not installed"),
+      stage: "native-exchange"
+    });
   });
 
   it("rejects a malformed helper response without storing it", async () => {
@@ -109,7 +112,10 @@ describe("Feishu native authorization", () => {
       stateFactory: () => "fixed-state"
     });
 
-    await expect(auth.authorize()).rejects.toThrow("OAuth state mismatch");
+    await expect(auth.authorize()).rejects.toMatchObject({
+      message: "OAuth state mismatch",
+      stage: "oauth-callback"
+    });
     expect(chromeApi.runtime.sendNativeMessage).not.toHaveBeenCalled();
   });
 

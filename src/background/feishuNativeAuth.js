@@ -29,29 +29,49 @@ export function createFeishuNativeAuth({
       requireChromiumRedirect(redirectUri);
       const state = stateFactory();
       const { verifier, challenge } = await createPkcePair(cryptoApi);
-      const callbackUrl = await chromeApi.identity.launchWebAuthFlow({
-        url: buildAuthorizeUrl({ appId, redirectUri, scopes: FEISHU_SCOPES, state, challenge }),
-        interactive: true
-      });
-      const { code } = parseOAuthCallback(callbackUrl, state);
-      const nativeResponse = await exchangeThroughNativeHost(chromeApi, {
-        type: "EXCHANGE_CODE",
-        appId,
-        code,
-        redirectUri,
-        codeVerifier: verifier
-      });
+      let callbackUrl;
+      try {
+        callbackUrl = await chromeApi.identity.launchWebAuthFlow({
+          url: buildAuthorizeUrl({ appId, redirectUri, scopes: FEISHU_SCOPES, state, challenge }),
+          interactive: true
+        });
+      } catch (error) {
+        throw withAuthStage(error, "oauth-launch");
+      }
+      let code;
+      try {
+        ({ code } = parseOAuthCallback(callbackUrl, state));
+      } catch (error) {
+        throw withAuthStage(error, "oauth-callback");
+      }
+      let nativeResponse;
+      try {
+        nativeResponse = await exchangeThroughNativeHost(chromeApi, {
+          type: "EXCHANGE_CODE",
+          appId,
+          code,
+          redirectUri,
+          codeVerifier: verifier
+        });
+      } catch (error) {
+        throw withAuthStage(error, "native-exchange");
+      }
       if (!nativeResponse?.ok) {
         throw new FeishuAuthError(knownNativeMessage(nativeResponse?.message), {
           code: Number(nativeResponse?.errorCode ?? 0),
-          logId: String(nativeResponse?.logId ?? "")
+          logId: String(nativeResponse?.logId ?? ""),
+          stage: "native-exchange"
         });
       }
-      return authSession.store({
-        accessToken: nativeResponse.accessToken,
-        expiresIn: Number(nativeResponse.expiresIn),
-        scope: nativeResponse.scope
-      });
+      try {
+        return await authSession.store({
+          accessToken: nativeResponse.accessToken,
+          expiresIn: Number(nativeResponse.expiresIn),
+          scope: nativeResponse.scope
+        });
+      } catch (error) {
+        throw withAuthStage(error, "auth-store");
+      }
     }
   };
 }
@@ -95,4 +115,13 @@ function knownNativeMessage(message) {
     "Feishu token response is incomplete"
   ]);
   return known.has(message) ? message : "Feishu authorization helper returned an invalid response";
+}
+
+function withAuthStage(error, stage) {
+  return new FeishuAuthError(String(error?.message ?? "Feishu authorization failed"), {
+    status: Number(error?.status ?? 0),
+    code: Number(error?.code ?? 0),
+    logId: String(error?.logId ?? ""),
+    stage
+  });
 }

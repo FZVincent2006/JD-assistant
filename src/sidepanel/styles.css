@@ -386,3 +386,7 @@ textarea {
   line-height: 1.4;
   padding: 10px 12px;
 }
+
+.status span {
+  white-space: pre-line;
+}
