@@ -179,11 +179,9 @@ function inspectJdCompany(model, rootChildren, start, end) {
 function validQuote(model, block) {
   if (block?.block_type !== BLOCK.QUOTE_CONTAINER) return false;
   const children = (model.childrenByParent.get(block.block_id) ?? []).map((id) => model.blocks.get(id));
-  const labels = children.filter((child) => child?.block_type === BLOCK.TEXT).map(textOfBlock);
+  const labels = children.filter((child) => child?.block_type === BLOCK.TEXT);
   const bullets = children.filter((child) => child?.block_type === BLOCK.BULLET);
-  return labels.some((text) => text === "工作内容：")
-    && labels.some((text) => text === "职位要求：")
-    && bullets.length >= 2;
+  return labels.length >= 1 && bullets.length >= 1;
 }
 
 function parseJobHeading(block) {

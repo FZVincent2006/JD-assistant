@@ -60,4 +60,19 @@ describe("Feishu recruiting document templates", () => {
     delete quote.quote_container;
     expect(() => inspect(incomplete)).toThrow("complete JD company template");
   });
+
+  it("accepts legacy wording inside an existing quote container", () => {
+    const legacy = structuredClone(fixture.items);
+    const workLabel = legacy.find((block) => block.block_id === "jd-company-b-work-label");
+    const requirementLabel = legacy.find((block) => block.block_id === "jd-company-b-require-label");
+    workLabel.text.elements[0].text_run.content = "岗位职责：";
+    requirementLabel.text.elements[0].text_run.content = "任职要求：";
+
+    const snapshot = inspect(legacy);
+
+    expect(snapshot.jd.companies).toHaveLength(2);
+    expect(snapshot.jd.companies[1].jobs).toEqual([
+      expect.objectContaining({ title: "示例岗位乙", ordinal: 1 })
+    ]);
+  });
 });
