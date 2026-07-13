@@ -114,7 +114,10 @@ function inspectJd(model, rootChildren, headingIndex) {
     return bulletId ? { callout, bulletId } : null;
   }).find(Boolean);
   if (!introTemplate) throw new Error("A required Feishu style template is missing");
-  const firstQuote = model.blocks.get(first.jobs[0].quoteBlockId);
+  const quoteTemplateJob = companies.flatMap((company) => company.jobs)
+    .find((job) => job.quoteBlockId);
+  if (!quoteTemplateJob) throw new Error("A required Feishu style template is missing");
+  const firstQuote = model.blocks.get(quoteTemplateJob.quoteBlockId);
   const quoteChildIds = model.childrenByParent.get(firstQuote.block_id) ?? [];
   const quoteText = quoteChildIds.map((id) => model.blocks.get(id)).find((block) => block?.block_type === BLOCK.TEXT);
   const quoteBullet = quoteChildIds.map((id) => model.blocks.get(id)).find((block) => block?.block_type === BLOCK.BULLET);
@@ -174,17 +177,15 @@ function inspectJdCompany(model, rootChildren, start, end) {
     if (!parsed) continue;
     const quoteIndex = nextNonBlankBlockIndex(blocks, index + 1);
     const quote = blocks[quoteIndex];
-    if (!validQuote(model, quote)) {
-      throw jdTemplateError("jd-job-quote", companyName, parsed.title);
-    }
+    const hasReusableQuote = validQuote(model, quote);
     jobs.push({
       ...parsed,
       text: textOfBlock(blocks[index]),
       blockId: blocks[index].block_id,
-      quoteBlockId: quote.block_id,
+      quoteBlockId: hasReusableQuote ? quote.block_id : "",
       index: start + index
     });
-    index = quoteIndex;
+    if (hasReusableQuote) index = quoteIndex;
   }
   if (!jobs.length) throw jdTemplateError("jd-jobs-empty", companyName);
   return {

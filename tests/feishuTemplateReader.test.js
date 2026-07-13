@@ -41,7 +41,7 @@ describe("Feishu recruiting document templates", () => {
     expect(serialized).not.toContain("示例工作内容");
   });
 
-  it("requires unique target headings and a complete root-level company template", () => {
+  it("requires unique target headings", () => {
     const duplicate = structuredClone(fixture.items);
     duplicate.push({
       block_id: "duplicate-jd-heading",
@@ -53,23 +53,31 @@ describe("Feishu recruiting document templates", () => {
     duplicate[0].children.push("duplicate-jd-heading");
     expect(() => inspect(duplicate)).toThrow("must appear exactly once");
 
-    const incomplete = structuredClone(fixture.items);
-    const quote = incomplete.find((block) => block.block_id === "jd-company-a-quote-1");
-    quote.block_type = 2;
-    quote.text = { elements: [{ text_run: { content: "不是引用容器" } }], style: {} };
-    delete quote.quote_container;
-    let failure;
-    try {
-      inspect(incomplete);
-    } catch (error) {
-      failure = error;
-    }
-    expect(failure).toMatchObject({
-      message: "No complete JD company template was found",
-      reasonCode: "jd-job-quote",
-      companyName: "示例公司甲",
-      jobTitle: "示例岗位甲"
+  });
+
+  it("keeps historical jobs with nonstandard bodies and selects a later reusable quote template", () => {
+    const mixed = structuredClone(fixture.items);
+    const firstQuote = mixed.find((block) => block.block_id === "jd-company-a-quote-1");
+    firstQuote.block_type = 2;
+    firstQuote.text = { elements: [{ text_run: { content: "历史正文不是引用容器" } }], style: {} };
+    delete firstQuote.quote_container;
+    const secondQuoteLabel = mixed.find((block) => block.block_id === "jd-company-b-work-label");
+    secondQuoteLabel.text.elements[0].text_run.text_element_style = { text_color: 6 };
+
+    const snapshot = inspect(mixed);
+
+    expect(snapshot.jd.companies[0].jobs).toEqual([
+      expect.objectContaining({ title: "示例岗位甲", quoteBlockId: "" })
+    ]);
+    expect(snapshot.jd.companies[1].jobs).toEqual([
+      expect.objectContaining({ title: "示例岗位乙", quoteBlockId: "jd-company-b-quote-1" })
+    ]);
+    expect(snapshot.templates.jd.quote).toMatchObject({ block_type: 34 });
+    expect(snapshot.templates.jd.quoteText).toMatchObject({
+      block_type: 2,
+      text: { elements: [{ text_run: { text_element_style: { text_color: 6 } } }] }
     });
+    expect(JSON.stringify(snapshot.templates.jd)).not.toContain("历史正文不是引用容器");
   });
 
   it("accepts legacy wording inside an existing quote container", () => {
