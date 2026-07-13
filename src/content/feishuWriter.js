@@ -65,10 +65,19 @@ export async function pasteFeishuFragment(target, fragment, dependencies = {}) {
   const writeClipboard = dependencies.writeClipboard ?? ((value) => writeRichClipboard(value, root));
   const dispatchPaste = dependencies.dispatchPaste ?? ((element, value) => dispatchRichPaste(element, value, root));
   const execCommand = dependencies.execCommand ?? ((command) => root.execCommand(command));
-  await writeClipboard(fragment);
+  let clipboardError = null;
+  try {
+    await writeClipboard(fragment);
+  } catch (error) {
+    clipboardError = error;
+  }
   target.element.focus();
   placeCaret(root, target.element, target.position);
   if (dispatchPaste(target.element, fragment)) return true;
+  if (clipboardError) {
+    const detail = clipboardError instanceof Error ? clipboardError.message : String(clipboardError);
+    throw new Error(`浏览器拒绝写入系统剪贴板：${detail}`);
+  }
   const pasted = execCommand("paste");
   if (!pasted) throw new Error("浏览器拒绝执行粘贴，请检查扩展剪贴板权限。");
   return true;

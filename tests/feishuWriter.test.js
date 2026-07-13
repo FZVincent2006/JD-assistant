@@ -141,6 +141,29 @@ describe("pasteFeishuFragment", () => {
     expect(execCommand).not.toHaveBeenCalled();
   });
 
+  it("still dispatches the editor paste when the page clipboard write is denied", async () => {
+    document.body.innerHTML = '<div contenteditable="true">Existing</div>';
+    const element = document.querySelector("div");
+    const pastedPayloads = [];
+    element.addEventListener("paste", (event) => {
+      pastedPayloads.push(event.clipboardData.getData("text/plain"));
+      event.preventDefault();
+    });
+
+    const result = await pasteFeishuFragment(
+      { element, position: "start" },
+      { html: "<p>New</p>", text: "New" },
+      {
+        root: document,
+        writeClipboard: vi.fn().mockRejectedValue(new DOMException("Document is not focused", "NotAllowedError")),
+        execCommand: vi.fn(() => false)
+      }
+    );
+
+    expect(result).toBe(true);
+    expect(pastedPayloads).toEqual(["New"]);
+  });
+
   it("writes the clipboard before placing the caret and invoking paste", async () => {
     document.body.innerHTML = '<div contenteditable="true">Existing</div>';
     const element = document.querySelector("div");
