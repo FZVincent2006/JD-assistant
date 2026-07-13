@@ -76,8 +76,10 @@ export async function pasteFeishuFragment(target, fragment, dependencies = {}) {
   if (dispatchPaste(target.element, fragment)) return true;
   if (execCommand("insertHTML", false, fragment.html)) return true;
   if (clipboardError) {
-    const detail = clipboardError instanceof Error ? clipboardError.message : String(clipboardError);
-    throw new Error(`浏览器拒绝写入系统剪贴板：${detail}`);
+    const detail = typeof clipboardError === "object" && clipboardError && "message" in clipboardError
+      ? clipboardError.message
+      : String(clipboardError);
+    throw new Error(`飞书编辑器拒绝直接插入富文本；系统剪贴板也不可用：${detail}`);
   }
   const pasted = execCommand("paste");
   if (!pasted) throw new Error("浏览器拒绝执行粘贴，请检查扩展剪贴板权限。");

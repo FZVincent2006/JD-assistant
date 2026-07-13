@@ -184,6 +184,22 @@ describe("pasteFeishuFragment", () => {
     expect(execCommand).toHaveBeenCalledWith("insertHTML", false, "<p>New</p>");
   });
 
+  it("reports the editor rejection separately when every insertion method fails", async () => {
+    document.body.innerHTML = '<div contenteditable="true">Existing</div>';
+    const element = document.querySelector("div");
+
+    await expect(pasteFeishuFragment(
+      { element, position: "start" },
+      { html: "<p>New</p>", text: "New" },
+      {
+        root: document,
+        writeClipboard: vi.fn().mockRejectedValue(new DOMException("Document is not focused", "NotAllowedError")),
+        dispatchPaste: vi.fn(() => false),
+        execCommand: vi.fn(() => false)
+      }
+    )).rejects.toThrow("飞书编辑器拒绝直接插入富文本；系统剪贴板也不可用：Document is not focused");
+  });
+
   it("writes the clipboard before placing the caret and inserting rich HTML", async () => {
     document.body.innerHTML = '<div contenteditable="true">Existing</div>';
     const element = document.querySelector("div");
