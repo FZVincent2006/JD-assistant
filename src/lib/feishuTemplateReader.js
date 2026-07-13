@@ -133,26 +133,36 @@ function inspectJdCompany(model, rootChildren, start, end) {
   const ids = rootChildren.slice(start, end);
   const blocks = ids.map((id) => model.blocks.get(id));
   const companyHeading = blocks[0];
+  const companyName = textOfBlock(companyHeading);
   const introIndex = blocks.findIndex((block) => isExactHeading(block, BLOCK.HEADING2, "公司介绍"));
   const openIndex = blocks.findIndex((block) => isExactHeading(block, BLOCK.HEADING2, "开放岗位"));
   const introCalloutIndex = blocks.findIndex((block, index) =>
     index > introIndex && index < openIndex && block?.block_type === BLOCK.CALLOUT
   );
-  if (introIndex !== 1 || introCalloutIndex < 0 || openIndex <= introCalloutIndex) {
-    throw new Error("No complete JD company template was found");
+  if (introIndex < 1 || !blocks.slice(1, introIndex).every(isBlankTextBlock)) {
+    throw jdTemplateError("jd-intro-heading", companyName);
+  }
+  if (introCalloutIndex < 0) {
+    throw jdTemplateError("jd-intro-callout", companyName);
+  }
+  if (openIndex <= introCalloutIndex) {
+    throw jdTemplateError("jd-open-heading", companyName);
   }
   const introCallout = blocks[introCalloutIndex];
   const introChildren = model.childrenByParent.get(introCallout.block_id) ?? [];
   if (!introChildren.some((id) => model.blocks.get(id)?.block_type === BLOCK.BULLET)) {
-    throw new Error("No complete JD company template was found");
+    throw jdTemplateError("jd-intro-bullet", companyName);
   }
 
   const jobs = [];
   for (let index = openIndex + 1; index < blocks.length; index += 1) {
     const parsed = parseJobHeading(blocks[index]);
     if (!parsed) continue;
-    const quote = blocks[index + 1];
-    if (!validQuote(model, quote)) throw new Error("No complete JD company template was found");
+    const quoteIndex = nextNonBlankBlockIndex(blocks, index + 1);
+    const quote = blocks[quoteIndex];
+    if (!validQuote(model, quote)) {
+      throw jdTemplateError("jd-job-quote", companyName, parsed.title);
+    }
     jobs.push({
       ...parsed,
       text: textOfBlock(blocks[index]),
@@ -160,11 +170,11 @@ function inspectJdCompany(model, rootChildren, start, end) {
       quoteBlockId: quote.block_id,
       index: start + index
     });
-    index += 1;
+    index = quoteIndex;
   }
-  if (!jobs.length) throw new Error("No complete JD company template was found");
+  if (!jobs.length) throw jdTemplateError("jd-jobs-empty", companyName);
   return {
-    name: textOfBlock(companyHeading),
+    name: companyName,
     headingBlockId: companyHeading.block_id,
     parentBlockId: model.rootId,
     index: start,
@@ -174,6 +184,24 @@ function inspectJdCompany(model, rootChildren, start, end) {
     openHeadingBlockId: blocks[openIndex].block_id,
     jobs
   };
+}
+
+function isBlankTextBlock(block) {
+  return block?.block_type === BLOCK.TEXT && !textOfBlock(block);
+}
+
+function nextNonBlankBlockIndex(blocks, start) {
+  let index = start;
+  while (index < blocks.length && isBlankTextBlock(blocks[index])) index += 1;
+  return index;
+}
+
+function jdTemplateError(reasonCode, companyName, jobTitle = "") {
+  return Object.assign(new Error("No complete JD company template was found"), {
+    reasonCode,
+    companyName,
+    ...(jobTitle ? { jobTitle } : {})
+  });
 }
 
 function validQuote(model, block) {

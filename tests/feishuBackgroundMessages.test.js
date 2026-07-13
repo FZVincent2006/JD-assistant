@@ -198,4 +198,16 @@ describe("Feishu service-worker messages", () => {
     expect(response.stage).toBe("template-inspection");
     expect(JSON.stringify(response)).not.toContain("private document text");
   });
+
+  it("reports a safe company and job when a JD quote relationship is invalid", () => {
+    const response = toPublicFeishuError(Object.assign(new Error("private block detail"), {
+      stage: "template-inspection",
+      reasonCode: "jd-job-quote",
+      companyName: "3. 示例公司",
+      jobTitle: "机械工程师"
+    }));
+
+    expect(response.error).toBe("公司“3. 示例公司”的岗位“机械工程师”标题后未找到有效引用块。文档不会被修改。");
+    expect(JSON.stringify(response)).not.toContain("private block detail");
+  });
 });

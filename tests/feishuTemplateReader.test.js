@@ -58,7 +58,18 @@ describe("Feishu recruiting document templates", () => {
     quote.block_type = 2;
     quote.text = { elements: [{ text_run: { content: "不是引用容器" } }], style: {} };
     delete quote.quote_container;
-    expect(() => inspect(incomplete)).toThrow("complete JD company template");
+    let failure;
+    try {
+      inspect(incomplete);
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({
+      message: "No complete JD company template was found",
+      reasonCode: "jd-job-quote",
+      companyName: "示例公司甲",
+      jobTitle: "示例岗位甲"
+    });
   });
 
   it("accepts legacy wording inside an existing quote container", () => {
@@ -74,5 +85,34 @@ describe("Feishu recruiting document templates", () => {
     expect(snapshot.jd.companies[1].jobs).toEqual([
       expect.objectContaining({ title: "示例岗位乙", ordinal: 1 })
     ]);
+  });
+
+  it("ignores empty root paragraphs between structural JD blocks", () => {
+    const withBlanks = structuredClone(fixture.items);
+    const page = withBlanks.find((block) => block.block_id === "page");
+    const blankAfterCompany = {
+      block_id: "blank-after-company-a",
+      parent_id: "page",
+      block_type: 2,
+      text: { elements: [{ text_run: { content: "" } }], style: {} },
+      children: []
+    };
+    const blankBeforeQuote = {
+      block_id: "blank-before-company-a-quote",
+      parent_id: "page",
+      block_type: 2,
+      text: { elements: [{ text_run: { content: "  " } }], style: {} },
+      children: []
+    };
+    withBlanks.push(blankAfterCompany, blankBeforeQuote);
+    page.children.splice(page.children.indexOf("jd-company-a") + 1, 0, blankAfterCompany.block_id);
+    page.children.splice(page.children.indexOf("jd-company-a-quote-1"), 0, blankBeforeQuote.block_id);
+
+    const snapshot = inspect(withBlanks);
+
+    expect(snapshot.jd.companies[0]).toMatchObject({
+      name: "示例公司甲",
+      jobs: [{ title: "示例岗位甲" }]
+    });
   });
 });

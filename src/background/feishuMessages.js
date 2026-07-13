@@ -86,7 +86,7 @@ export function toPublicFeishuError(error) {
   const stage = typeof error?.stage === "string" ? error.stage : "unknown";
   return {
     ok: false,
-    error: publicErrorMessage(stage, error?.message, error?.reasonCode),
+    error: publicErrorMessage(stage, error?.message, error?.reasonCode, error),
     errorCode: Number.isFinite(error?.code) ? error.code : 0,
     status: Number.isFinite(error?.status) ? error.status : 0,
     logId: typeof error?.logId === "string" ? error.logId : "",
@@ -94,7 +94,7 @@ export function toPublicFeishuError(error) {
   };
 }
 
-function publicErrorMessage(stage, internalMessage, reasonCode) {
+function publicErrorMessage(stage, internalMessage, reasonCode, context = {}) {
   const knownReasons = {
     "Feishu authorization helper is not installed": "Edge 未找到本机授权助手。请完全退出并重新打开 Edge；若仍失败，请重新运行安装助手。",
     "Feishu authorization helper failed": "Edge 启动本机授权助手失败，请完全退出并重新打开 Edge 后重试。",
@@ -119,6 +119,17 @@ function publicErrorMessage(stage, internalMessage, reasonCode) {
     "template-unknown": "无法识别测试副本的招聘模板结构。文档不会被修改。"
   };
   if (inspectionReasons[reasonCode]) return inspectionReasons[reasonCode];
+  const companyName = safePublicLabel(context.companyName, "未知公司");
+  const jobTitle = safePublicLabel(context.jobTitle, "未知岗位");
+  const jdReasons = {
+    "jd-intro-heading": `公司“${companyName}”的“公司介绍”二级标题位置不符合模板。文档不会被修改。`,
+    "jd-intro-callout": `公司“${companyName}”的公司介绍下未找到高亮块。文档不会被修改。`,
+    "jd-open-heading": `公司“${companyName}”的“开放岗位”二级标题位置不符合模板。文档不会被修改。`,
+    "jd-intro-bullet": `公司“${companyName}”的介绍高亮块中未找到项目符号内容。文档不会被修改。`,
+    "jd-job-quote": `公司“${companyName}”的岗位“${jobTitle}”标题后未找到有效引用块。文档不会被修改。`,
+    "jd-jobs-empty": `公司“${companyName}”下未识别到有效岗位标题。文档不会被修改。`
+  };
+  if (jdReasons[reasonCode]) return jdReasons[reasonCode];
   const messages = {
     "authorization-required": "尚未完成飞书授权，请先点击“授权飞书”。",
     "oauth-launch": "未能打开飞书授权窗口，请检查浏览器身份授权设置。",
@@ -165,8 +176,21 @@ export function classifyFeishuInspectionFailure(error, stage) {
 function wrapFeishuInspectionFailure(error, stage) {
   const wrapped = new Error("Feishu document structure inspection failed");
   wrapped.stage = stage;
-  wrapped.reasonCode = classifyFeishuInspectionFailure(error, stage);
+  wrapped.reasonCode = typeof error?.reasonCode === "string"
+    ? error.reasonCode
+    : classifyFeishuInspectionFailure(error, stage);
+  if (typeof error?.companyName === "string") wrapped.companyName = safePublicLabel(error.companyName);
+  if (typeof error?.jobTitle === "string") wrapped.jobTitle = safePublicLabel(error.jobTitle);
   return wrapped;
+}
+
+function safePublicLabel(value, fallback = "") {
+  const safe = String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  return safe || fallback;
 }
 
 function publicAuthStatus(value = {}) {
