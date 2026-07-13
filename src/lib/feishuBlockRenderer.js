@@ -23,7 +23,8 @@ export function renderJdDescendants(draft, plan, templates) {
       "jd-company-heading",
       templates.companyHeading,
       draft.companyName,
-      draft.website
+      draft.website,
+      { sequence: "auto" }
     ));
     addRoot(childrenId, descendants, textBlock("jd-intro-heading", templates.subheading, "公司介绍"));
 
@@ -121,7 +122,7 @@ function addRoot(childrenId, descendants, block) {
   descendants.push(block);
 }
 
-function textBlock(id, template, content, link) {
+function textBlock(id, template, content, link, styleOverrides = {}) {
   const field = fieldForBlockType(template.block_type);
   const property = template[field] ?? {};
   const elementStyle = property.elements?.find((element) => element?.text_run)?.text_run?.text_element_style ?? {};
@@ -129,7 +130,10 @@ function textBlock(id, template, content, link) {
     block_id: id,
     block_type: template.block_type,
     [field]: {
-      style: structuredClone(property.style ?? {}),
+      style: {
+        ...structuredClone(property.style ?? {}),
+        ...structuredClone(styleOverrides)
+      },
       elements: [makeTextRun(content, elementStyle, link)]
     },
     children: []

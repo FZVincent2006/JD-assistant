@@ -56,8 +56,12 @@ describe("Feishu native block rendering", () => {
     const request = renderJdDescendants(draft, plan, snapshot.templates.jd);
     const byId = blockMap(request);
     const rootTypes = request.children_id.map((id) => byId.get(id).block_type);
+    const companyHeading = byId.get("jd-company-heading");
 
     expect(rootTypes).toEqual([3, 4, 19, 4, 5, 34, 5, 34]);
+    expect(companyHeading.heading1.style.sequence).toBe("auto");
+    expect(blockText(companyHeading)).toBe(draft.companyName);
+    expect(blockText(companyHeading)).not.toMatch(/^\s*1[.、]/);
     expect(request.descendants.map((block) => block.block_type)).toEqual(expect.arrayContaining([2, 3, 4, 5, 12, 19, 34]));
     expect(byId.get("jd-intro-callout").children.every((id) => byId.get(id).block_type === 12)).toBe(true);
     expect(byId.get("jd-job-1-quote").children.map((id) => byId.get(id).block_type)).toEqual([2, 12, 12, 2, 12]);
