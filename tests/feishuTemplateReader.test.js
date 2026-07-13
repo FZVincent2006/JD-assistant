@@ -211,4 +211,52 @@ describe("Feishu recruiting document templates", () => {
     });
     expect(JSON.stringify(snapshot.templates.jd)).not.toContain("示例公司乙介绍正文");
   });
+
+  it("keeps a legacy company even when none of its job headings match the canonical pattern", () => {
+    const mixed = structuredClone(fixture.items);
+    const secondJob = mixed.find((block) => block.block_id === "jd-company-b-job-1");
+    secondJob.heading3.elements[0].text_run.content = "招聘详情";
+
+    const snapshot = inspect(mixed);
+
+    expect(snapshot.jd.companies).toHaveLength(2);
+    expect(snapshot.jd.companies[1]).toMatchObject({
+      name: "示例公司乙",
+      jobs: []
+    });
+    expect(snapshot.templates.jd.jobTitle).toMatchObject({ block_type: 5 });
+    expect(snapshot.templates.jd.quote).toMatchObject({ block_type: 34 });
+  });
+
+  it("reads incomplete historical company sections and selects complete templates from another company", () => {
+    const mixed = structuredClone(fixture.items);
+    const page = mixed.find((block) => block.block_id === "page");
+    const removedIds = new Set([
+      "jd-company-a-intro-heading",
+      "jd-company-a-intro-callout",
+      "jd-company-a-intro-bullet",
+      "jd-company-a-open-heading"
+    ]);
+    page.children = page.children.filter((id) => !removedIds.has(id));
+    const remaining = mixed.filter((block) => !removedIds.has(block.block_id));
+    const secondIntroHeading = remaining.find((block) => block.block_id === "jd-company-b-intro-heading");
+    secondIntroHeading.heading2.elements[0].text_run.text_element_style = { text_color: 8 };
+
+    const snapshot = inspect(remaining);
+
+    expect(snapshot.jd.companies[0]).toMatchObject({
+      name: "示例公司甲",
+      introHeadingBlockId: "",
+      introCalloutBlockId: "",
+      openHeadingBlockId: "",
+      jobs: [{ title: "示例岗位甲" }]
+    });
+    expect(snapshot.templates.jd.subheading).toMatchObject({
+      block_type: 4,
+      heading2: {
+        elements: [{ text_run: { text_element_style: { text_color: 8 } } }]
+      }
+    });
+    expect(snapshot.templates.jd.callout).toMatchObject({ block_type: 19 });
+  });
 });

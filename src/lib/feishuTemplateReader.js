@@ -107,6 +107,8 @@ function inspectJd(model, rootChildren, headingIndex) {
     return inspectJdCompany(model, rootChildren, start, end);
   });
   const first = companies[0];
+  const introHeadingCompany = companies.find((company) => company.introHeadingBlockId);
+  const openHeadingCompany = companies.find((company) => company.openHeadingBlockId);
   const introTemplate = companies.map((company) => {
     const callout = model.blocks.get(company.introCalloutBlockId);
     const bulletId = (model.childrenByParent.get(callout?.block_id) ?? [])
@@ -116,7 +118,9 @@ function inspectJd(model, rootChildren, headingIndex) {
   if (!introTemplate) throw new Error("A required Feishu style template is missing");
   const quoteTemplateJob = companies.flatMap((company) => company.jobs)
     .find((job) => job.quoteBlockId);
-  if (!quoteTemplateJob) throw new Error("A required Feishu style template is missing");
+  if (!introHeadingCompany || !openHeadingCompany || !quoteTemplateJob) {
+    throw new Error("A required Feishu style template is missing");
+  }
   const firstQuote = model.blocks.get(quoteTemplateJob.quoteBlockId);
   const quoteChildIds = model.childrenByParent.get(firstQuote.block_id) ?? [];
   const quoteText = quoteChildIds.map((id) => model.blocks.get(id)).find((block) => block?.block_type === BLOCK.TEXT);
@@ -129,11 +133,11 @@ function inspectJd(model, rootChildren, headingIndex) {
     companies,
     templates: {
       companyHeading: styleTemplate(model.blocks.get(first.headingBlockId)),
-      subheading: styleTemplate(model.blocks.get(first.introHeadingBlockId)),
-      openHeading: styleTemplate(model.blocks.get(first.openHeadingBlockId)),
+      subheading: styleTemplate(model.blocks.get(introHeadingCompany.introHeadingBlockId)),
+      openHeading: styleTemplate(model.blocks.get(openHeadingCompany.openHeadingBlockId)),
       callout: styleTemplate(introTemplate.callout),
       introBullet: styleTemplate(model.blocks.get(introTemplate.bulletId)),
-      jobTitle: styleTemplate(model.blocks.get(first.jobs[0].blockId)),
+      jobTitle: styleTemplate(model.blocks.get(quoteTemplateJob.blockId)),
       quote: styleTemplate(firstQuote),
       quoteText: styleTemplate(quoteText),
       quoteBullet: styleTemplate(quoteBullet)
@@ -155,24 +159,19 @@ function inspectJdCompany(model, rootChildren, start, end) {
   );
   const openHeading = openHeadings.length === 1 ? openHeadings[0] : null;
   const openIndex = openHeading?.rootIndex ?? -1;
-  if (introIndex < 1 || !blocks.slice(1, introIndex).every(isBlankTextBlock)) {
-    throw jdTemplateError("jd-intro-heading", companyName);
-  }
-  if (openIndex <= introIndex) {
-    throw jdTemplateError("jd-open-heading", companyName);
-  }
-  const introCallouts = findBlocksInSubtrees(
-    model,
-    blocks.slice(introIndex + 1, openIndex),
-    BLOCK.CALLOUT
-  );
-  if (introCallouts.length !== 1) {
-    throw jdTemplateError("jd-intro-callout", companyName);
-  }
-  const introCallout = introCallouts[0];
+  const validIntroPosition = introIndex >= 1
+    && blocks.slice(1, introIndex).every(isBlankTextBlock);
+  const introCallouts = validIntroPosition && openIndex > introIndex
+    ? findBlocksInSubtrees(
+      model,
+      blocks.slice(introIndex + 1, openIndex),
+      BLOCK.CALLOUT
+    )
+    : [];
+  const introCallout = introCallouts.length === 1 ? introCallouts[0] : null;
 
   const jobs = [];
-  for (let index = openIndex + 1; index < blocks.length; index += 1) {
+  for (let index = 1; index < blocks.length; index += 1) {
     const parsed = parseJobHeading(blocks[index]);
     if (!parsed) continue;
     const quoteIndex = nextNonBlankBlockIndex(blocks, index + 1);
@@ -187,7 +186,6 @@ function inspectJdCompany(model, rootChildren, start, end) {
     });
     if (hasReusableQuote) index = quoteIndex;
   }
-  if (!jobs.length) throw jdTemplateError("jd-jobs-empty", companyName);
   return {
     name: companyName,
     headingBlockId: companyHeading.block_id,
@@ -195,11 +193,11 @@ function inspectJdCompany(model, rootChildren, start, end) {
     parentBlockId: model.rootId,
     index: start,
     endIndex: end,
-    introHeadingBlockId: blocks[introIndex].block_id,
-    introHeadingBlockType: blocks[introIndex].block_type,
-    introCalloutBlockId: introCallout.block_id,
-    openHeadingBlockId: openHeading.block.block_id,
-    openHeadingBlockType: openHeading.block.block_type,
+    introHeadingBlockId: validIntroPosition ? blocks[introIndex].block_id : "",
+    introHeadingBlockType: validIntroPosition ? blocks[introIndex].block_type : undefined,
+    introCalloutBlockId: introCallout?.block_id ?? "",
+    openHeadingBlockId: openHeading?.block.block_id ?? "",
+    openHeadingBlockType: openHeading?.block.block_type,
     jobs
   };
 }
