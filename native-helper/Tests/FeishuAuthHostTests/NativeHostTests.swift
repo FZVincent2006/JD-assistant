@@ -10,6 +10,28 @@ struct StubTokenExchanger: TokenExchanging {
 }
 
 func runNativeHostTests() async throws -> Int {
+    try expect(
+        acceptsNativeHostLaunchArguments([]),
+        "native host allows direct stdio launch"
+    )
+    try expect(
+        acceptsNativeHostLaunchArguments([
+            "chrome-extension://nnfieabngjmimnogokgbccekfpdifgdb/"
+        ]),
+        "native host accepts Chromium extension origin argument"
+    )
+    try expect(
+        !acceptsNativeHostLaunchArguments(["https://example.com/"]),
+        "native host rejects non-extension origins"
+    )
+    try expect(
+        !acceptsNativeHostLaunchArguments([
+            "chrome-extension://nnfieabngjmimnogokgbccekfpdifgdb/",
+            "unexpected-extra-argument"
+        ]),
+        "native host rejects extra launch arguments"
+    )
+
     let request = ExchangeCodeRequest(
         type: "EXCHANGE_CODE",
         appId: "cli_test1234",
@@ -37,5 +59,5 @@ func runNativeHostTests() async throws -> Int {
     try expect(!rejected.ok, "native host rejects non-exchange request")
     let rejectedJSON = String(decoding: try JSONEncoder().encode(rejected), as: UTF8.self)
     try expect(!rejectedJSON.contains("WRITE_DOCUMENT"), "native error does not echo request body")
-    return 4
+    return 8
 }

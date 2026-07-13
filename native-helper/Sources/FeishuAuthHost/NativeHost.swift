@@ -1,5 +1,14 @@
 import Foundation
 
+package func acceptsNativeHostLaunchArguments(_ arguments: [String]) -> Bool {
+    if arguments.isEmpty { return true }
+    guard arguments.count == 1 else { return false }
+    return arguments[0].range(
+        of: #"^chrome-extension://[a-p]{32}/$"#,
+        options: .regularExpression
+    ) != nil
+}
+
 package struct NativeHostResponse: Codable, Equatable {
     package let ok: Bool
     package let accessToken: String?

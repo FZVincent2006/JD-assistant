@@ -39,7 +39,7 @@ struct FeishuAuthHostMain {
             return
         }
 
-        guard arguments.isEmpty else { exit(2) }
+        guard acceptsNativeHostLaunchArguments(arguments) else { exit(2) }
         guard
             let input = InputStream(fileAtPath: "/dev/stdin"),
             let output = OutputStream(toFileAtPath: "/dev/stdout", append: false)
