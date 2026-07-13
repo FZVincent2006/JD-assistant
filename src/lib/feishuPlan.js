@@ -1,3 +1,5 @@
+export { buildFeishuOpenApiPlan } from "./feishuOpenApiPlan.js";
+
 export function buildFeishuWritePlan(snapshot = {}, draft = {}) {
   const errors = validateSnapshot(snapshot);
   const companyName = draft.companyName?.trim() ?? "";
