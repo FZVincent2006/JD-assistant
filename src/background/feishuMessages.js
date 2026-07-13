@@ -20,7 +20,18 @@ export function createFeishuBackgroundServices({ chromeApi = chrome, fetchImpl =
   const client = createFeishuApiClient({ fetchImpl, getAccessToken: auth.getAccessToken });
   const inspect = async () => {
     const document = await resolveFixedTestDocument(client);
-    const snapshot = inspectRecruitingDocument(buildBlockModel(document.blocks, document.revisionId));
+    let model;
+    try {
+      model = buildBlockModel(document.blocks, document.revisionId);
+    } catch (error) {
+      throw wrapFeishuInspectionFailure(error, "block-model");
+    }
+    let snapshot;
+    try {
+      snapshot = inspectRecruitingDocument(model);
+    } catch (error) {
+      throw wrapFeishuInspectionFailure(error, "template-inspection");
+    }
     return {
       ...snapshot,
       documentId: document.documentId,
@@ -75,7 +86,7 @@ export function toPublicFeishuError(error) {
   const stage = typeof error?.stage === "string" ? error.stage : "unknown";
   return {
     ok: false,
-    error: publicErrorMessage(stage, error?.message),
+    error: publicErrorMessage(stage, error?.message, error?.reasonCode),
     errorCode: Number.isFinite(error?.code) ? error.code : 0,
     status: Number.isFinite(error?.status) ? error.status : 0,
     logId: typeof error?.logId === "string" ? error.logId : "",
@@ -83,7 +94,7 @@ export function toPublicFeishuError(error) {
   };
 }
 
-function publicErrorMessage(stage, internalMessage) {
+function publicErrorMessage(stage, internalMessage, reasonCode) {
   const knownReasons = {
     "Feishu authorization helper is not installed": "Edge 未找到本机授权助手。请完全退出并重新打开 Edge；若仍失败，请重新运行安装助手。",
     "Feishu authorization helper failed": "Edge 启动本机授权助手失败，请完全退出并重新打开 Edge 后重试。",
@@ -94,6 +105,20 @@ function publicErrorMessage(stage, internalMessage) {
     "Feishu authorization was cancelled": "飞书授权已取消，请重新点击“授权飞书”并完成确认。"
   };
   if (knownReasons[internalMessage]) return knownReasons[internalMessage];
+  const inspectionReasons = {
+    "block-list-empty": "飞书返回的文档块列表为空。文档不会被修改。",
+    "page-root-invalid": "飞书文档根块结构异常。文档不会被修改。",
+    "block-tree-invalid": "飞书返回的文档块树不完整或不一致。文档不会被修改。",
+    "portfolio-heading-count": "未能唯一识别“Portfolio开放岗位汇总”标题。文档不会被修改。",
+    "jd-heading-count": "未能唯一识别“岗位JD整理”标题。文档不会被修改。",
+    "target-layout": "两个目标标题不是预期的根级顺序。文档不会被修改。",
+    "portfolio-callout": "Portfolio 区未能唯一识别岗位汇总高亮块。文档不会被修改。",
+    "portfolio-template": "Portfolio 区至少有一个公司块不符合固定模板。文档不会被修改。",
+    "jd-template": "岗位 JD 区至少有一个公司块不符合固定模板。文档不会被修改。",
+    "style-template": "测试副本缺少生成新内容所需的样式模板。文档不会被修改。",
+    "template-unknown": "无法识别测试副本的招聘模板结构。文档不会被修改。"
+  };
+  if (inspectionReasons[reasonCode]) return inspectionReasons[reasonCode];
   const messages = {
     "authorization-required": "尚未完成飞书授权，请先点击“授权飞书”。",
     "oauth-launch": "未能打开飞书授权窗口，请检查浏览器身份授权设置。",
@@ -105,6 +130,43 @@ function publicErrorMessage(stage, internalMessage) {
     "document-blocks-read": "无法读取飞书文档内容，请检查应用权限与文档状态。"
   };
   return messages[stage] ?? "飞书操作失败，请根据错误码检查授权、权限或文档状态。";
+}
+
+export function classifyFeishuInspectionFailure(error, stage) {
+  const message = String(error?.message ?? "");
+  if (stage === "block-model") {
+    if (message === "Feishu block list is empty") return "block-list-empty";
+    if (message === "Feishu document must contain exactly one Page block") return "page-root-invalid";
+    if (/block (?:is missing an ID|has a missing child|tree contains|appears more than once|parent mismatch)|Duplicate Feishu block ID/.test(message)) {
+      return "block-tree-invalid";
+    }
+    return "block-tree-invalid";
+  }
+  if (message.includes("Portfolio开放岗位汇总") && message.includes("must appear exactly once")) {
+    return "portfolio-heading-count";
+  }
+  if (message.includes("岗位JD整理") && message.includes("must appear exactly once")) {
+    return "jd-heading-count";
+  }
+  if (/Target headings must be root-level siblings|Portfolio section must precede the JD section/.test(message)) {
+    return "target-layout";
+  }
+  if (message === "Portfolio section must contain exactly one Callout") return "portfolio-callout";
+  if (/Portfolio company template is incomplete|No complete Portfolio company template was found/.test(message)) {
+    return "portfolio-template";
+  }
+  if (message === "No complete JD company template was found") return "jd-template";
+  if (/required Feishu style template|Unsupported Feishu template block type/.test(message)) {
+    return "style-template";
+  }
+  return "template-unknown";
+}
+
+function wrapFeishuInspectionFailure(error, stage) {
+  const wrapped = new Error("Feishu document structure inspection failed");
+  wrapped.stage = stage;
+  wrapped.reasonCode = classifyFeishuInspectionFailure(error, stage);
+  return wrapped;
 }
 
 function publicAuthStatus(value = {}) {

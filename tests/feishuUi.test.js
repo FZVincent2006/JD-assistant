@@ -50,6 +50,19 @@ describe("formatFeishuOperationError", () => {
     expect(formatFeishuOperationError(null, "失败。"))
       .toBe("失败。");
   });
+
+  it("labels local block and template inspection stages", () => {
+    expect(formatFeishuOperationError({
+      error: "块树异常。",
+      stage: "block-model"
+    }, "失败。"))
+      .toBe("块树异常。\n诊断：构建文档块树");
+    expect(formatFeishuOperationError({
+      error: "模板异常。",
+      stage: "template-inspection"
+    }, "失败。"))
+      .toBe("模板异常。\n诊断：识别招聘模板");
+  });
 });
 
 describe("Feishu write readiness", () => {

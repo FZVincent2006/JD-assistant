@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  classifyFeishuInspectionFailure,
   handleFeishuBackgroundMessage,
   registerFeishuBackgroundMessages,
   toPublicFeishuError
@@ -162,5 +163,39 @@ describe("Feishu service-worker messages", () => {
       new Error("untrusted helper output containing a secret"),
       { stage: "native-exchange" }
     )).error).toBe("飞书授权交换失败，请检查本机授权助手与飞书应用凭证。");
+  });
+
+  it("classifies document inspection failures without exposing document content", () => {
+    expect(classifyFeishuInspectionFailure(
+      new Error("Feishu block tree contains orphan blocks"),
+      "block-model"
+    )).toBe("block-tree-invalid");
+    expect(classifyFeishuInspectionFailure(
+      new Error("“岗位JD整理” must appear exactly once"),
+      "template-inspection"
+    )).toBe("jd-heading-count");
+    expect(classifyFeishuInspectionFailure(
+      new Error("Portfolio section must contain exactly one Callout"),
+      "template-inspection"
+    )).toBe("portfolio-callout");
+    expect(classifyFeishuInspectionFailure(
+      new Error("No complete JD company template was found"),
+      "template-inspection"
+    )).toBe("jd-template");
+    expect(classifyFeishuInspectionFailure(
+      new Error("private document text"),
+      "template-inspection"
+    )).toBe("template-unknown");
+  });
+
+  it("returns safe structural guidance for classified inspection failures", () => {
+    const response = toPublicFeishuError(Object.assign(new Error("private document text"), {
+      stage: "template-inspection",
+      reasonCode: "jd-template"
+    }));
+
+    expect(response.error).toBe("岗位 JD 区至少有一个公司块不符合固定模板。文档不会被修改。");
+    expect(response.stage).toBe("template-inspection");
+    expect(JSON.stringify(response)).not.toContain("private document text");
   });
 });

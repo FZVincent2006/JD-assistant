@@ -88,7 +88,9 @@ function operationStageLabel(stage) {
     "auth-store": "保存授权状态",
     "wiki-resolve": "读取 Wiki 节点",
     "document-metadata": "读取文档信息",
-    "document-blocks-read": "读取文档内容"
+    "document-blocks-read": "读取文档内容",
+    "block-model": "构建文档块树",
+    "template-inspection": "识别招聘模板"
   };
   return labels[stage] ?? (stage && stage !== "unknown" ? stage : "");
 }
