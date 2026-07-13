@@ -135,7 +135,9 @@ function inspectJdCompany(model, rootChildren, start, end) {
   const companyHeading = blocks[0];
   const companyName = textOfBlock(companyHeading);
   const introIndex = blocks.findIndex((block) => isExactHeading(block, BLOCK.HEADING2, "公司介绍"));
-  const openIndex = blocks.findIndex((block) => isExactHeading(block, BLOCK.HEADING2, "开放岗位"));
+  const openHeadings = findExactHeadingsInSubtrees(model, blocks, BLOCK.HEADING2, "开放岗位");
+  const openHeading = openHeadings.length === 1 ? openHeadings[0] : null;
+  const openIndex = openHeading?.rootIndex ?? -1;
   if (introIndex < 1 || !blocks.slice(1, introIndex).every(isBlankTextBlock)) {
     throw jdTemplateError("jd-intro-heading", companyName);
   }
@@ -183,7 +185,7 @@ function inspectJdCompany(model, rootChildren, start, end) {
     endIndex: end,
     introHeadingBlockId: blocks[introIndex].block_id,
     introCalloutBlockId: introCallout.block_id,
-    openHeadingBlockId: blocks[openIndex].block_id,
+    openHeadingBlockId: openHeading.block.block_id,
     jobs
   };
 }
@@ -216,6 +218,21 @@ function findBlocksInSubtrees(model, roots, blockType) {
     }
   };
   roots.forEach(visit);
+  return matches;
+}
+
+function findExactHeadingsInSubtrees(model, roots, blockType, text) {
+  const matches = [];
+  roots.forEach((root, rootIndex) => {
+    const visit = (block) => {
+      if (!block) return;
+      if (isExactHeading(block, blockType, text)) matches.push({ block, rootIndex });
+      for (const childId of model.childrenByParent.get(block.block_id) ?? []) {
+        visit(model.blocks.get(childId));
+      }
+    };
+    visit(root);
+  });
   return matches;
 }
 
