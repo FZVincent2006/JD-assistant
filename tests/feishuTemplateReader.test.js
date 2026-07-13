@@ -115,4 +115,28 @@ describe("Feishu recruiting document templates", () => {
       jobs: [{ title: "示例岗位甲" }]
     });
   });
+
+  it("finds a company introduction callout nested in a layout container", () => {
+    const nested = structuredClone(fixture.items);
+    const page = nested.find((block) => block.block_id === "page");
+    const callout = nested.find((block) => block.block_id === "jd-company-a-intro-callout");
+    const wrapper = {
+      block_id: "jd-company-a-intro-layout",
+      parent_id: "page",
+      block_type: 25,
+      grid_column: { width_ratio: 100 },
+      children: [callout.block_id]
+    };
+    callout.parent_id = wrapper.block_id;
+    page.children.splice(page.children.indexOf(callout.block_id), 1, wrapper.block_id);
+    nested.push(wrapper);
+
+    const snapshot = inspect(nested);
+
+    expect(snapshot.jd.companies[0]).toMatchObject({
+      name: "示例公司甲",
+      introCalloutBlockId: "jd-company-a-intro-callout"
+    });
+    expect(snapshot.templates.jd.callout).toMatchObject({ block_type: 19 });
+  });
 });

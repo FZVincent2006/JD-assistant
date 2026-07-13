@@ -136,19 +136,21 @@ function inspectJdCompany(model, rootChildren, start, end) {
   const companyName = textOfBlock(companyHeading);
   const introIndex = blocks.findIndex((block) => isExactHeading(block, BLOCK.HEADING2, "公司介绍"));
   const openIndex = blocks.findIndex((block) => isExactHeading(block, BLOCK.HEADING2, "开放岗位"));
-  const introCalloutIndex = blocks.findIndex((block, index) =>
-    index > introIndex && index < openIndex && block?.block_type === BLOCK.CALLOUT
-  );
   if (introIndex < 1 || !blocks.slice(1, introIndex).every(isBlankTextBlock)) {
     throw jdTemplateError("jd-intro-heading", companyName);
   }
-  if (introCalloutIndex < 0) {
-    throw jdTemplateError("jd-intro-callout", companyName);
-  }
-  if (openIndex <= introCalloutIndex) {
+  if (openIndex <= introIndex) {
     throw jdTemplateError("jd-open-heading", companyName);
   }
-  const introCallout = blocks[introCalloutIndex];
+  const introCallouts = findBlocksInSubtrees(
+    model,
+    blocks.slice(introIndex + 1, openIndex),
+    BLOCK.CALLOUT
+  );
+  if (introCallouts.length !== 1) {
+    throw jdTemplateError("jd-intro-callout", companyName);
+  }
+  const introCallout = introCallouts[0];
   const introChildren = model.childrenByParent.get(introCallout.block_id) ?? [];
   if (!introChildren.some((id) => model.blocks.get(id)?.block_type === BLOCK.BULLET)) {
     throw jdTemplateError("jd-intro-bullet", companyName);
@@ -202,6 +204,19 @@ function jdTemplateError(reasonCode, companyName, jobTitle = "") {
     companyName,
     ...(jobTitle ? { jobTitle } : {})
   });
+}
+
+function findBlocksInSubtrees(model, roots, blockType) {
+  const matches = [];
+  const visit = (block) => {
+    if (!block) return;
+    if (block.block_type === blockType) matches.push(block);
+    for (const childId of model.childrenByParent.get(block.block_id) ?? []) {
+      visit(model.blocks.get(childId));
+    }
+  };
+  roots.forEach(visit);
+  return matches;
 }
 
 function validQuote(model, block) {
