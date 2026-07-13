@@ -6,10 +6,57 @@ export function updateJobDraftField(draft, index, field, value) {
 }
 
 export function formatFeishuWriteStatus(result) {
-  if (result.ok) {
+  if (result?.ok || result?.status === "success") {
     const action = result.mode === "append-jobs" ? "新岗位已追加" : "新公司已更新";
     return `写入成功：${action} JD 区和岗位汇总区。`;
   }
-  if (result.completed?.includes("jd")) return `部分完成：JD 区已写入。${result.error}`;
-  return result.error || "飞书写入失败。";
+  const detail = result?.repairHint || result?.error || "请检查测试副本文档。";
+  if (result?.status === "partial" || (result?.completedStages ?? result?.completed)?.includes("jd")) {
+    return `部分完成：岗位 JD 区已确认写入；Portfolio 区未完成。${detail}`;
+  }
+  if (result?.status === "unknown") {
+    return `结果未知（${phaseLabel(result.failedStage)}）：${detail}`;
+  }
+  return `写入失败（${phaseLabel(result?.failedStage)}）：${detail}`;
+}
+
+export function canWriteFeishu({ authStatus, inspection, plan, errors = [], writing = false }) {
+  return authStatus === "authorized"
+    && Boolean(inspection)
+    && Boolean(plan?.ok)
+    && Number.isInteger(inspection.revisionId)
+    && plan.baseRevisionId === inspection.revisionId
+    && errors.length === 0
+    && !writing;
+}
+
+export function describeFeishuPlan(plan) {
+  if (!plan?.ok) {
+    return {
+      title: "计划不可执行",
+      position: (plan?.errors ?? []).join("；") || "请先检查授权、文档与预览字段。",
+      jobs: []
+    };
+  }
+  const isAppend = plan.mode === "append-jobs";
+  return {
+    title: isAppend ? "老公司追加岗位" : "新公司置顶",
+    position: isAppend
+      ? "将在 Portfolio 与岗位 JD 的原公司分组末尾追加，不创建第二个公司块。"
+      : "将公司插入 Portfolio 汇总首位，并在“岗位JD整理”下以根级一级标题置顶。",
+    jobs: (plan.jobs ?? []).map((job) =>
+      `（${job.ordinal}）${job.title}｜${job.location}｜${job.employment}`
+    )
+  };
+}
+
+function phaseLabel(stage) {
+  const labels = {
+    preflight: "写入前检查",
+    "jd-write": "岗位 JD 写入",
+    "jd-verify": "岗位 JD 校验",
+    "summary-write": "Portfolio 写入",
+    "summary-verify": "Portfolio 校验"
+  };
+  return labels[stage] ?? "飞书操作";
 }

@@ -48,7 +48,11 @@ export async function handleFeishuBackgroundMessage(message, services) {
       return { ok: true, inspection: publicInspection(await services.inspect()) };
     case "FEISHU_PLAN": {
       const snapshot = await services.inspect();
-      return { ok: true, plan: publicPlan(buildFeishuOpenApiPlan(snapshot, message.payload ?? {})) };
+      return {
+        ok: true,
+        inspection: publicInspection(snapshot),
+        plan: publicPlan(buildFeishuOpenApiPlan(snapshot, message.payload ?? {}))
+      };
     }
     case "FEISHU_WRITE":
       return services.writer.write(message.payload ?? {});

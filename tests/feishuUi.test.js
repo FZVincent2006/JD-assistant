@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatFeishuWriteStatus, updateJobDraftField } from "../src/sidepanel/feishuUi.js";
+import {
+  canWriteFeishu,
+  describeFeishuPlan,
+  formatFeishuWriteStatus,
+  updateJobDraftField
+} from "../src/sidepanel/feishuUi.js";
 
 describe("updateJobDraftField", () => {
   it("updates one nested job without mutating the other jobs", () => {
@@ -12,10 +17,51 @@ describe("updateJobDraftField", () => {
 });
 
 describe("formatFeishuWriteStatus", () => {
-  it("describes full and partial write outcomes", () => {
-    expect(formatFeishuWriteStatus({ ok: true, completed: ["jd", "summary"], mode: "new-company" }))
+  it("describes full, partial, failed, and unknown write outcomes without overclaiming", () => {
+    expect(formatFeishuWriteStatus({ ok: true, status: "success", completedStages: ["jd", "summary"], mode: "new-company" }))
       .toBe("写入成功：新公司已更新 JD 区和岗位汇总区。");
-    expect(formatFeishuWriteStatus({ ok: false, completed: ["jd"], error: "汇总校验失败" }))
-      .toBe("部分完成：JD 区已写入。汇总校验失败");
+    expect(formatFeishuWriteStatus({ ok: false, status: "partial", completedStages: ["jd"], failedStage: "summary-write", repairHint: "检查 Portfolio 区" }))
+      .toBe("部分完成：岗位 JD 区已确认写入；Portfolio 区未完成。检查 Portfolio 区");
+    expect(formatFeishuWriteStatus({ ok: false, status: "failed", failedStage: "jd-verify", repairHint: "检查岗位 JD 区" }))
+      .toBe("写入失败（岗位 JD 校验）：检查岗位 JD 区");
+    const unknown = formatFeishuWriteStatus({ status: "unknown", failedStage: "jd-write", repairHint: "检查 JD 区" });
+    expect(unknown).toContain("结果未知");
+    expect(unknown).not.toContain("写入失败");
+    expect(unknown).not.toContain("写入成功");
+  });
+});
+
+describe("Feishu write readiness", () => {
+  const ready = {
+    authStatus: "authorized",
+    inspection: { revisionId: 12 },
+    plan: { ok: true, baseRevisionId: 12 },
+    errors: [],
+    writing: false
+  };
+
+  it("requires authorization, a current inspection, a valid matching plan, and no draft errors", () => {
+    expect(canWriteFeishu(ready)).toBe(true);
+    expect(canWriteFeishu({ ...ready, authStatus: "unauthorized" })).toBe(false);
+    expect(canWriteFeishu({ ...ready, inspection: null })).toBe(false);
+    expect(canWriteFeishu({ ...ready, plan: null })).toBe(false);
+    expect(canWriteFeishu({ ...ready, plan: { ok: false, baseRevisionId: 12 } })).toBe(false);
+    expect(canWriteFeishu({ ...ready, plan: { ok: true, baseRevisionId: 11 } })).toBe(false);
+    expect(canWriteFeishu({ ...ready, errors: ["缺少岗位"] })).toBe(false);
+    expect(canWriteFeishu({ ...ready, writing: true })).toBe(false);
+  });
+
+  it("describes new-company and append plans in human terms with assigned ordinals", () => {
+    expect(describeFeishuPlan({
+      ok: true,
+      mode: "new-company",
+      jobs: [{ title: "品牌设计", location: "上海", employment: "社招", ordinal: 1 }]
+    })).toEqual({
+      title: "新公司置顶",
+      position: "将公司插入 Portfolio 汇总首位，并在“岗位JD整理”下以根级一级标题置顶。",
+      jobs: ["（1）品牌设计｜上海｜社招"]
+    });
+    expect(describeFeishuPlan({ ok: true, mode: "append-jobs", jobs: [] }).position)
+      .toContain("原公司分组末尾");
   });
 });

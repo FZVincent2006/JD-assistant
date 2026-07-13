@@ -79,7 +79,8 @@ describe("Feishu service-worker messages", () => {
 
     expect(planned).toMatchObject({
       ok: true,
-      plan: { mode: "new-company", companyName: "新公司", jobs: [{ title: "新岗位", ordinal: 1 }] }
+      plan: { mode: "new-company", companyName: "新公司", jobs: [{ title: "新岗位", ordinal: 1 }] },
+      inspection: { revisionId: 7, title: "测试副本" }
     });
     expect(planned.plan).not.toHaveProperty("jdTarget");
     expect(planned.plan).not.toHaveProperty("summaryTarget");
