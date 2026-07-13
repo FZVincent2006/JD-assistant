@@ -63,13 +63,38 @@ export async function executeFeishuWrite({ url, draft, root = document }, depend
 export async function pasteFeishuFragment(target, fragment, dependencies = {}) {
   const root = dependencies.root ?? document;
   const writeClipboard = dependencies.writeClipboard ?? ((value) => writeRichClipboard(value, root));
+  const dispatchPaste = dependencies.dispatchPaste ?? ((element, value) => dispatchRichPaste(element, value, root));
   const execCommand = dependencies.execCommand ?? ((command) => root.execCommand(command));
   await writeClipboard(fragment);
   target.element.focus();
   placeCaret(root, target.element, target.position);
+  if (dispatchPaste(target.element, fragment)) return true;
   const pasted = execCommand("paste");
   if (!pasted) throw new Error("浏览器拒绝执行粘贴，请检查扩展剪贴板权限。");
   return true;
+}
+
+function dispatchRichPaste(element, fragment, root) {
+  const view = root.defaultView ?? globalThis;
+  const clipboardData = createClipboardData(view);
+  clipboardData.setData("text/html", fragment.html);
+  clipboardData.setData("text/plain", fragment.text);
+  const EventType = view.ClipboardEvent ?? view.Event ?? Event;
+  const event = new EventType("paste", { bubbles: true, cancelable: true, clipboardData });
+  if (event.clipboardData !== clipboardData) {
+    Object.defineProperty(event, "clipboardData", { value: clipboardData });
+  }
+  return element.dispatchEvent(event) === false || event.defaultPrevented;
+}
+
+function createClipboardData(view) {
+  if (typeof view.DataTransfer === "function") return new view.DataTransfer();
+  const values = new Map();
+  return {
+    getData: (type) => values.get(type) ?? "",
+    setData: (type, value) => { values.set(type, String(value)); },
+    get types() { return Array.from(values.keys()); }
+  };
 }
 
 async function writeRichClipboard(fragment, root) {

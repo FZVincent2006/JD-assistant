@@ -113,6 +113,34 @@ describe("executeFeishuWrite", () => {
 });
 
 describe("pasteFeishuFragment", () => {
+  it("lets the editor handle a rich paste event without relying on execCommand paste", async () => {
+    document.body.innerHTML = '<div contenteditable="true">Existing</div>';
+    const element = document.querySelector("div");
+    const execCommand = vi.fn(() => false);
+    const pastedPayloads = [];
+    element.addEventListener("paste", (event) => {
+      pastedPayloads.push({
+        html: event.clipboardData.getData("text/html"),
+        text: event.clipboardData.getData("text/plain")
+      });
+      event.preventDefault();
+    });
+
+    const result = await pasteFeishuFragment(
+      { element, position: "start" },
+      { html: "<p>New</p>", text: "New" },
+      {
+        root: document,
+        writeClipboard: vi.fn().mockResolvedValue(undefined),
+        execCommand
+      }
+    );
+
+    expect(result).toBe(true);
+    expect(pastedPayloads).toEqual([{ html: "<p>New</p>", text: "New" }]);
+    expect(execCommand).not.toHaveBeenCalled();
+  });
+
   it("writes the clipboard before placing the caret and invoking paste", async () => {
     document.body.innerHTML = '<div contenteditable="true">Existing</div>';
     const element = document.querySelector("div");
