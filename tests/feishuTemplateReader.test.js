@@ -163,4 +163,23 @@ describe("Feishu recruiting document templates", () => {
       jobs: [{ title: "示例岗位甲" }]
     });
   });
+
+  it("treats a gray Heading 1 named 开放岗位 as a section heading, not a company", () => {
+    const actual = structuredClone(fixture.items);
+    const openHeading = actual.find((block) => block.block_id === "jd-company-a-open-heading");
+    openHeading.block_type = 3;
+    openHeading.heading1 = openHeading.heading2;
+    delete openHeading.heading2;
+
+    const snapshot = inspect(actual);
+
+    expect(snapshot.jd.companies).toHaveLength(2);
+    expect(snapshot.jd.companies[0]).toMatchObject({
+      name: "示例公司甲",
+      openHeadingBlockId: "jd-company-a-open-heading",
+      openHeadingBlockType: 3,
+      jobs: [{ title: "示例岗位甲" }]
+    });
+    expect(snapshot.templates.jd.openHeading).toMatchObject({ block_type: 3 });
+  });
 });

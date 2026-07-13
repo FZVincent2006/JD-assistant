@@ -95,7 +95,10 @@ function inspectPortfolio(model, rootChildren, headingIndex, jdHeadingIndex) {
 function inspectJd(model, rootChildren, headingIndex) {
   const companyStarts = [];
   for (let index = headingIndex + 1; index < rootChildren.length; index += 1) {
-    if (model.blocks.get(rootChildren[index])?.block_type === BLOCK.HEADING1) companyStarts.push(index);
+    const block = model.blocks.get(rootChildren[index]);
+    if (block?.block_type === BLOCK.HEADING1 && textOfBlock(block) !== "开放岗位") {
+      companyStarts.push(index);
+    }
   }
   if (!companyStarts.length) throw new Error("No complete JD company template was found");
 
@@ -119,6 +122,7 @@ function inspectJd(model, rootChildren, headingIndex) {
     templates: {
       companyHeading: styleTemplate(model.blocks.get(first.headingBlockId)),
       subheading: styleTemplate(model.blocks.get(first.introHeadingBlockId)),
+      openHeading: styleTemplate(model.blocks.get(first.openHeadingBlockId)),
       callout: styleTemplate(introCallout),
       introBullet: styleTemplate(model.blocks.get(introBulletId)),
       jobTitle: styleTemplate(model.blocks.get(first.jobs[0].blockId)),
@@ -135,7 +139,12 @@ function inspectJdCompany(model, rootChildren, start, end) {
   const companyHeading = blocks[0];
   const companyName = textOfBlock(companyHeading);
   const introIndex = blocks.findIndex((block) => isExactHeading(block, BLOCK.HEADING2, "公司介绍"));
-  const openHeadings = findExactHeadingsInSubtrees(model, blocks, BLOCK.HEADING2, "开放岗位");
+  const openHeadings = findExactHeadingsInSubtrees(
+    model,
+    blocks,
+    [BLOCK.HEADING1, BLOCK.HEADING2],
+    "开放岗位"
+  );
   const openHeading = openHeadings.length === 1 ? openHeadings[0] : null;
   const openIndex = openHeading?.rootIndex ?? -1;
   if (introIndex < 1 || !blocks.slice(1, introIndex).every(isBlankTextBlock)) {
@@ -180,12 +189,15 @@ function inspectJdCompany(model, rootChildren, start, end) {
   return {
     name: companyName,
     headingBlockId: companyHeading.block_id,
+    blockType: companyHeading.block_type,
     parentBlockId: model.rootId,
     index: start,
     endIndex: end,
     introHeadingBlockId: blocks[introIndex].block_id,
+    introHeadingBlockType: blocks[introIndex].block_type,
     introCalloutBlockId: introCallout.block_id,
     openHeadingBlockId: openHeading.block.block_id,
+    openHeadingBlockType: openHeading.block.block_type,
     jobs
   };
 }
@@ -221,12 +233,15 @@ function findBlocksInSubtrees(model, roots, blockType) {
   return matches;
 }
 
-function findExactHeadingsInSubtrees(model, roots, blockType, text) {
+function findExactHeadingsInSubtrees(model, roots, blockTypes, text) {
+  const allowedTypes = Array.isArray(blockTypes) ? blockTypes : [blockTypes];
   const matches = [];
   roots.forEach((root, rootIndex) => {
     const visit = (block) => {
       if (!block) return;
-      if (isExactHeading(block, blockType, text)) matches.push({ block, rootIndex });
+      if (allowedTypes.some((blockType) => isExactHeading(block, blockType, text))) {
+        matches.push({ block, rootIndex });
+      }
       for (const childId of model.childrenByParent.get(block.block_id) ?? []) {
         visit(model.blocks.get(childId));
       }

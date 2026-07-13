@@ -67,6 +67,27 @@ describe("Feishu native block rendering", () => {
     expect(allTexts(request)).toContain("美妆经验优先。");
   });
 
+  it("copies a distinct gray Heading 1 template for 开放岗位 when the document uses it", () => {
+    const { snapshot, plan } = setup();
+    snapshot.templates.jd.openHeading = {
+      block_type: 3,
+      heading1: {
+        style: {},
+        elements: [{ text_run: { text_element_style: { text_color: 3 } } }]
+      }
+    };
+
+    const request = renderJdDescendants(draft, plan, snapshot.templates.jd);
+    const openHeading = blockMap(request).get("jd-open-heading");
+
+    expect(openHeading).toMatchObject({
+      block_type: 3,
+      heading1: {
+        elements: [{ text_run: { content: "开放岗位", text_element_style: { text_color: 3 } } }]
+      }
+    });
+  });
+
   it("renders append mode without duplicating company, intro, or open-jobs blocks", () => {
     const current = setup().snapshot;
     current.portfolio.companies[0].name = draft.companyName;

@@ -210,4 +210,14 @@ describe("Feishu service-worker messages", () => {
     expect(response.error).toBe("公司“3. 示例公司”的岗位“机械工程师”标题后未找到有效引用块。文档不会被修改。");
     expect(JSON.stringify(response)).not.toContain("private block detail");
   });
+
+  it("describes the real open-jobs Heading 1/2 contract", () => {
+    const response = toPublicFeishuError(Object.assign(new Error("private block detail"), {
+      stage: "template-inspection",
+      reasonCode: "jd-open-heading",
+      companyName: "闪念贝壳"
+    }));
+
+    expect(response.error).toBe("公司“闪念贝壳”的“开放岗位”未识别为唯一的 Heading 1/2 分区标题。文档不会被修改。");
+  });
 });

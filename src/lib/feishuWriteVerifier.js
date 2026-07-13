@@ -21,8 +21,11 @@ export function verifyJdWrite(snapshot = {}, plan = {}) {
     errors.push("岗位 JD 区缺少“公司介绍”Heading 2。");
   }
   if (!company.introCalloutBlockId) errors.push("岗位 JD 区缺少公司介绍 Callout。");
-  if (!company.openHeadingBlockId || invalidOptionalType(company.openHeadingBlockType, BLOCK.HEADING2)) {
-    errors.push("岗位 JD 区缺少“开放岗位”Heading 2。");
+  if (!company.openHeadingBlockId || invalidOptionalTypes(
+    company.openHeadingBlockType,
+    [BLOCK.HEADING1, BLOCK.HEADING2]
+  )) {
+    errors.push("岗位 JD 区缺少“开放岗位”Heading 1/2。");
   }
 
   const jobs = company.jobs ?? [];
@@ -122,6 +125,10 @@ function matchingCompanies(companies = [], companyName) {
 
 function invalidOptionalType(value, expected) {
   return value !== undefined && value !== expected;
+}
+
+function invalidOptionalTypes(value, expected) {
+  return value !== undefined && !expected.includes(value);
 }
 
 function result(errors) {

@@ -124,7 +124,7 @@ function publicErrorMessage(stage, internalMessage, reasonCode, context = {}) {
   const jdReasons = {
     "jd-intro-heading": `公司“${companyName}”的“公司介绍”二级标题位置不符合模板。文档不会被修改。`,
     "jd-intro-callout": `公司“${companyName}”的公司介绍下未找到高亮块。文档不会被修改。`,
-    "jd-open-heading": `公司“${companyName}”的“开放岗位”二级标题位置不符合模板。文档不会被修改。`,
+    "jd-open-heading": `公司“${companyName}”的“开放岗位”未识别为唯一的 Heading 1/2 分区标题。文档不会被修改。`,
     "jd-intro-bullet": `公司“${companyName}”的介绍高亮块中未找到项目符号内容。文档不会被修改。`,
     "jd-job-quote": `公司“${companyName}”的岗位“${jobTitle}”标题后未找到有效引用块。文档不会被修改。`,
     "jd-jobs-empty": `公司“${companyName}”下未识别到有效岗位标题。文档不会被修改。`

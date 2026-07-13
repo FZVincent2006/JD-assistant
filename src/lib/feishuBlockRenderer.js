@@ -6,6 +6,7 @@ export function renderJdDescendants(draft, plan, templates) {
   requirePlan(plan);
   requireTemplate(templates?.companyHeading, BLOCK.HEADING1, "company Heading 1");
   requireTemplate(templates?.subheading, BLOCK.HEADING2, "gray Heading 2");
+  requireOneOfTemplates(templates?.openHeading, [BLOCK.HEADING1, BLOCK.HEADING2], "gray open-jobs Heading");
   requireTemplate(templates?.callout, BLOCK.CALLOUT, "introduction Callout");
   requireTemplate(templates?.introBullet, BLOCK.BULLET, "introduction Bullet");
   requireTemplate(templates?.quote, BLOCK.QUOTE_CONTAINER, "job QuoteContainer");
@@ -36,7 +37,7 @@ export function renderJdDescendants(draft, plan, templates) {
         draft.companyIntro?.length ? draft.companyIntro[index] : "待补充"
       ));
     });
-    addRoot(childrenId, descendants, textBlock("jd-open-heading", templates.subheading, "开放岗位"));
+    addRoot(childrenId, descendants, textBlock("jd-open-heading", templates.openHeading, "开放岗位"));
   }
 
   for (const [index, job] of plan.jobs.entries()) {
@@ -178,6 +179,12 @@ function requirePlan(plan) {
 
 function requireTemplate(template, blockType, label) {
   if (template?.block_type !== blockType || !fieldForBlockType(blockType)) {
+    throw new Error(`A valid ${label} template is required`);
+  }
+}
+
+function requireOneOfTemplates(template, blockTypes, label) {
+  if (!blockTypes.includes(template?.block_type) || !fieldForBlockType(template.block_type)) {
     throw new Error(`A valid ${label} template is required`);
   }
 }

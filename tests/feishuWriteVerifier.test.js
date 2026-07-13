@@ -37,6 +37,13 @@ describe("Feishu persisted-write verification", () => {
     expect(result.errors.join(" ")).toContain("QuoteContainer");
   });
 
+  it("accepts the real document's gray Heading 1 for 开放岗位", () => {
+    const { plan, jd } = successfulSnapshots();
+    jd.jd.companies[0].openHeadingBlockType = 3;
+
+    expect(verifyJdWrite(jd, plan)).toEqual({ ok: true, errors: [] });
+  });
+
   it("rejects wrong job counts, ordinals, title text, and root sibling positions", () => {
     const { plan, jd } = successfulSnapshots();
     jd.jd.companies[0].jobs.pop();
