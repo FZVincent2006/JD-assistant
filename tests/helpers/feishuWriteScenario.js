@@ -47,6 +47,7 @@ export function successfulSnapshots() {
     introHeadingBlockId: "new-intro-heading",
     introHeadingBlockType: 4,
     introCalloutBlockId: "new-intro-callout",
+    introTexts: [...draft.companyIntro],
     openHeadingBlockId: "new-open-heading",
     openHeadingBlockType: 4,
     jobs: plan.jobs.map((job, index) => ({
@@ -56,7 +57,12 @@ export function successfulSnapshots() {
       blockId: `new-job-${index + 1}`,
       blockType: 5,
       quoteBlockId: `new-quote-${index + 1}`,
-      index: plan.jdTarget.index + 4 + (index * 2)
+      index: plan.jdTarget.index + 4 + (index * 2),
+      location: job.location,
+      employment: job.employment,
+      responsibilities: [...job.responsibilities],
+      requirements: [...job.requirements],
+      bonuses: [...job.bonuses]
     }))
   });
 

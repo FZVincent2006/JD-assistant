@@ -3,6 +3,7 @@ import fixture from "./fixtures/feishu-structural-sample.json";
 import { buildBlockModel } from "../src/lib/feishuBlockModel.js";
 import { inspectRecruitingDocument } from "../src/lib/feishuTemplateReader.js";
 import { buildFeishuOpenApiPlan } from "../src/lib/feishuOpenApiPlan.js";
+import { draft, successfulSnapshots } from "./helpers/feishuWriteScenario.js";
 
 const coFANCYDraft = {
   companyName: "CoFANCY 可糖",
@@ -133,5 +134,36 @@ describe("buildFeishuOpenApiPlan", () => {
     expect(plan.errors.join(" ")).toContain("Portfolio 区必须位于岗位 JD 区之前");
     expect(plan.errors.join(" ")).toContain("公司名");
     expect(plan.errors.join(" ")).toContain("至少需要一个岗位");
+  });
+
+  it("builds a resume plan when an exact JD company exists without Portfolio", () => {
+    const current = successfulSnapshots().unnumberedJd;
+
+    const plan = buildFeishuOpenApiPlan(current, draft);
+
+    expect(plan).toMatchObject({
+      ok: true,
+      mode: "resume-new-company",
+      companyName: draft.companyName,
+      jdTarget: { parentBlockId: current.rootId, index: current.jd.firstCompanyIndex },
+      summaryTarget: {
+        parentBlockId: current.portfolio.parentBlockId,
+        index: current.portfolio.firstCompanyIndex
+      },
+      jobs: [{ ordinal: 1 }, { ordinal: 2 }],
+      expected: { totalJdJobs: 2, totalSummaryJobs: 2 },
+      errors: []
+    });
+  });
+
+  it("refuses recovery when existing JD prose differs from the draft", () => {
+    const current = successfulSnapshots().unnumberedJd;
+    current.jd.companies[0].jobs[0].responsibilities[0] = "被人工修改的职责";
+
+    const plan = buildFeishuOpenApiPlan(current, draft);
+
+    expect(plan.ok).toBe(false);
+    expect(plan.errors.join(" ")).toContain("现有岗位 JD 与本次草稿不完全一致");
+    expect(plan.errors.join(" ")).toContain("工作内容");
   });
 });

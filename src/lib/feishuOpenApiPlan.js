@@ -1,4 +1,5 @@
 import { validateCompanyDraft } from "./companyJdParser.js";
+import { matchResumeCompany } from "./feishuResumeMatcher.js";
 
 const DASHES = /[‐‑‒–—―−﹘﹣－]/g;
 
@@ -7,16 +8,28 @@ export function buildFeishuOpenApiPlan(snapshot = {}, draft = {}) {
   const companyName = String(draft.companyName ?? "").trim();
   const portfolioMatches = matchingCompanies(snapshot.portfolio?.companies, companyName);
   const jdMatches = matchingCompanies(snapshot.jd?.companies, companyName);
+  const resumeCandidate = portfolioMatches.length === 0 && jdMatches.length === 1;
+  const resumeMatch = resumeCandidate ? matchResumeCompany(jdMatches[0], draft) : null;
 
   if (portfolioMatches.length > 1 || jdMatches.length > 1) {
     errors.push("公司名在目标区域中不唯一，已停止写入。");
+  } else if (resumeCandidate) {
+    if (!resumeMatch.ok) {
+      errors.push(`现有岗位 JD 与本次草稿不完全一致：${resumeMatch.errors.join("、")}`);
+    }
+    if (jdMatches[0]?.index !== snapshot.jd?.firstCompanyIndex) {
+      errors.push("现有岗位 JD 不在首家公司位置，不能安全恢复。");
+    }
   } else if ((portfolioMatches.length === 1) !== (jdMatches.length === 1)) {
     errors.push("公司只存在于一个目标区域，文档结构不一致。");
   }
 
-  const mode = portfolioMatches.length === 1 && jdMatches.length === 1
-    ? "append-jobs"
-    : "new-company";
+  const mode = resumeCandidate && resumeMatch.ok
+    && jdMatches[0]?.index === snapshot.jd?.firstCompanyIndex
+    ? "resume-new-company"
+    : portfolioMatches.length === 1 && jdMatches.length === 1
+      ? "append-jobs"
+      : "new-company";
   const portfolioCompany = portfolioMatches[0];
   const jdCompany = jdMatches[0];
   const existingPortfolioJobs = portfolioCompany?.jobs ?? [];
@@ -26,7 +39,7 @@ export function buildFeishuOpenApiPlan(snapshot = {}, draft = {}) {
   detectStoredDuplicates(existingJdJobs, "岗位 JD", errors);
 
   const existingTitles = new Set(
-    [...existingPortfolioJobs, ...existingJdJobs]
+    (mode === "append-jobs" ? [...existingPortfolioJobs, ...existingJdJobs] : [])
       .map((job) => normalizeForMatch(job.title))
       .filter(Boolean)
   );
@@ -42,16 +55,18 @@ export function buildFeishuOpenApiPlan(snapshot = {}, draft = {}) {
     inputTitles.add(normalized);
   }
 
-  const nextOrdinal = mode === "append-jobs"
-    ? maximumOrdinal(existingJdJobs) + 1
-    : 1;
+  const nextOrdinal = mode === "append-jobs" ? maximumOrdinal(existingJdJobs) + 1 : 1;
   const jobs = (draft.jobs ?? []).map((job, index) => ({
     ...structuredClone(job),
     title: String(job.title ?? "").trim(),
-    ordinal: nextOrdinal + index
+    ordinal: mode === "resume-new-company"
+      ? Number(existingJdJobs[index]?.ordinal)
+      : nextOrdinal + index
   }));
   const jdTarget = mode === "append-jobs"
     ? { parentBlockId: snapshot.jd?.parentBlockId, index: jdCompany?.endIndex }
+    : mode === "resume-new-company"
+      ? { parentBlockId: snapshot.jd?.parentBlockId, index: jdCompany?.index }
     : { parentBlockId: snapshot.jd?.parentBlockId, index: snapshot.jd?.firstCompanyIndex };
   const summaryTarget = mode === "append-jobs"
     ? {
@@ -77,8 +92,12 @@ export function buildFeishuOpenApiPlan(snapshot = {}, draft = {}) {
     expected: {
       companyName,
       jobTitles: jobs.map((job) => job.title),
-      totalJdJobs: existingJdJobs.length + jobs.length,
-      totalSummaryJobs: existingPortfolioJobs.length + jobs.length
+      totalJdJobs: mode === "resume-new-company"
+        ? existingJdJobs.length
+        : existingJdJobs.length + jobs.length,
+      totalSummaryJobs: mode === "resume-new-company"
+        ? jobs.length
+        : existingPortfolioJobs.length + jobs.length
     },
     errors
   };

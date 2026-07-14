@@ -169,6 +169,9 @@ function inspectJdCompany(model, rootChildren, start, end) {
     )
     : [];
   const introCallout = introCallouts.length === 1 ? introCallouts[0] : null;
+  const introTexts = introCallout
+    ? findBlocksInSubtrees(model, [introCallout], BLOCK.BULLET).map(textOfBlock)
+    : [];
 
   const jobs = [];
   for (let index = 1; index < blocks.length; index += 1) {
@@ -177,8 +180,10 @@ function inspectJdCompany(model, rootChildren, start, end) {
     const quoteIndex = nextNonBlankBlockIndex(blocks, index + 1);
     const quote = blocks[quoteIndex];
     const hasReusableQuote = validQuote(model, quote);
+    const sections = hasReusableQuote ? quoteSections(model, quote) : emptyQuoteSections();
     jobs.push({
       ...parsed,
+      ...sections,
       text: textOfBlock(blocks[index]),
       blockId: blocks[index].block_id,
       quoteBlockId: hasReusableQuote ? quote.block_id : "",
@@ -197,6 +202,7 @@ function inspectJdCompany(model, rootChildren, start, end) {
     introHeadingBlockId: validIntroPosition ? blocks[introIndex].block_id : "",
     introHeadingBlockType: validIntroPosition ? blocks[introIndex].block_type : undefined,
     introCalloutBlockId: introCallout?.block_id ?? "",
+    introTexts,
     openHeadingBlockId: openHeading?.block.block_id ?? "",
     openHeadingBlockType: openHeading?.block.block_type,
     jobs
@@ -262,9 +268,46 @@ function validQuote(model, block) {
 
 function parseJobHeading(block) {
   if (!block || ![BLOCK.HEADING3, BLOCK.TEXT].includes(block.block_type)) return null;
-  const match = textOfBlock(block).match(/^[（(](\d+)[）)]\s*([^｜|]+)\s*[｜|]/);
+  const match = textOfBlock(block).match(/^[（(](\d+)[）)]\s*([^｜|]+)\s*[｜|]\s*([^｜|]+)\s*[｜|]\s*(.+)$/);
   if (!match) return null;
-  return { ordinal: Number(match[1]), title: match[2].trim() };
+  return {
+    ordinal: Number(match[1]),
+    title: match[2].trim(),
+    location: match[3].trim(),
+    employment: match[4].trim()
+  };
+}
+
+function quoteSections(model, quote) {
+  const sections = emptyQuoteSections();
+  let active = "";
+  for (const childId of model.childrenByParent.get(quote.block_id) ?? []) {
+    const child = model.blocks.get(childId);
+    if (child?.block_type === BLOCK.TEXT) {
+      active = quoteSectionKey(textOfBlock(child));
+      continue;
+    }
+    if (child?.block_type === BLOCK.BULLET && active) {
+      sections[active].push(textOfBlock(child));
+    }
+  }
+  return sections;
+}
+
+function emptyQuoteSections() {
+  return { responsibilities: [], requirements: [], bonuses: [] };
+}
+
+function quoteSectionKey(value) {
+  const label = String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[：:]\s*$/, "")
+    .replace(/\s+/g, "")
+    .trim();
+  if (["工作内容", "岗位职责"].includes(label)) return "responsibilities";
+  if (["职位要求", "任职要求"].includes(label)) return "requirements";
+  if (["加分项", "你可获得"].includes(label)) return "bonuses";
+  return "";
 }
 
 function jobTitleFromSummary(value) {

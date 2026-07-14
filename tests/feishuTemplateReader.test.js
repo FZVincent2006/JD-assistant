@@ -16,7 +16,16 @@ describe("Feishu recruiting document templates", () => {
       headingBlockId: "jd-company-a",
       parentBlockId: "page",
       index: 3,
-      jobs: [{ title: "示例岗位甲", ordinal: 1 }]
+      introTexts: ["示例公司甲介绍正文"],
+      jobs: [{
+        title: "示例岗位甲",
+        ordinal: 1,
+        location: "上海",
+        employment: "社招",
+        responsibilities: ["示例工作内容"],
+        requirements: ["示例职位要求"],
+        bonuses: []
+      }]
     });
     expect(snapshot.jd.firstCompanyIndex).toBe(3);
     expect(snapshot.jd.companies.map((company) => company.headingSequence)).toEqual(["auto", "auto"]);
