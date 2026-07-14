@@ -373,8 +373,8 @@ function numberingRepairHint(error) {
   const hints = {
     "accessibility-not-granted": "未获得 macOS 辅助功能权限；请在系统设置中允许飞书授权助手控制电脑，然后重试。",
     "unsupported-front-app": "当前最前方不是受支持的 Chrome 或 Edge；请打开测试副本并保持浏览器在前台。",
-    "web-area-not-found": "未在当前浏览器窗口找到测试副本页面；请打开固定测试副本后重试。",
-    "web-area-not-focused": "无法把焦点放到测试副本文档；请点击文档页面后重试。",
+    "web-area-missing": "未在当前浏览器窗口找到测试副本页面；请打开固定测试副本后重试。",
+    "web-area-focus-failed": "无法把焦点放到测试副本文档；请点击文档页面后重试。",
     "native-event-failed": "本机未能发送固定的自动编号快捷键；已停止 Portfolio 写入。"
   };
   return hints[error?.reason]

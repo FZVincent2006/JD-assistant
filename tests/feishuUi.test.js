@@ -21,6 +21,8 @@ describe("formatFeishuWriteStatus", () => {
   it("describes full, partial, failed, and unknown write outcomes without overclaiming", () => {
     expect(formatFeishuWriteStatus({ ok: true, status: "success", completedStages: ["jd", "summary"], mode: "new-company" }))
       .toBe("写入成功：新公司已更新 JD 区和岗位汇总区。");
+    expect(formatFeishuWriteStatus({ ok: true, status: "success", completedStages: ["jd", "summary"], mode: "resume-new-company" }))
+      .toBe("恢复成功：未重复写入 JD，已完成自动编号和 Portfolio 汇总。");
     expect(formatFeishuWriteStatus({ ok: false, status: "partial", completedStages: ["jd"], failedStage: "summary-write", repairHint: "检查 Portfolio 区" }))
       .toBe("部分完成：岗位 JD 区已确认写入；Portfolio 区未完成。检查 Portfolio 区\n诊断：Portfolio 写入");
     expect(formatFeishuWriteStatus({ ok: false, status: "failed", failedStage: "jd-verify", repairHint: "检查岗位 JD 区" }))
@@ -60,6 +62,20 @@ describe("formatFeishuWriteStatus", () => {
       httpStatus: 0,
       logId: ""
     })).not.toContain("诊断：");
+  });
+
+  it("gives actionable macOS Accessibility guidance during recovery", () => {
+    expect(formatFeishuWriteStatus({
+      status: "partial",
+      mode: "resume-new-company",
+      failedStage: "jd-numbering-page",
+      repairHint: "未获得 macOS 辅助功能权限；请在系统设置中允许飞书授权助手控制电脑，然后重试。",
+      reason: "accessibility-not-granted"
+    })).toBe(
+      "恢复未完成：现有岗位 JD 已确认存在，但自动编号尚未确认；Portfolio 区未写入。" +
+      "未获得 macOS 辅助功能权限；请在系统设置中允许飞书授权助手控制电脑，然后重试。\n" +
+      "诊断：页面自动编号"
+    );
   });
 });
 
@@ -116,7 +132,7 @@ describe("Feishu write readiness", () => {
     expect(canWriteFeishu({ ...ready, writing: true })).toBe(false);
   });
 
-  it("describes new-company and append plans in human terms with assigned ordinals", () => {
+  it("describes new-company, append, and exact recovery plans in human terms", () => {
     expect(describeFeishuPlan({
       ok: true,
       mode: "new-company",
@@ -128,5 +144,14 @@ describe("Feishu write readiness", () => {
     });
     expect(describeFeishuPlan({ ok: true, mode: "append-jobs", jobs: [] }).position)
       .toContain("原公司分组末尾");
+    expect(describeFeishuPlan({
+      ok: true,
+      mode: "resume-new-company",
+      jobs: [{ title: "品牌设计", location: "上海", employment: "社招", ordinal: 1 }]
+    })).toEqual({
+      title: "恢复未完成的新公司",
+      position: "岗位 JD 已存在且与本次草稿完全一致；不会重复写 JD，只补公司一级标题自动编号，校验后将公司插入 Portfolio 汇总首位。",
+      jobs: ["（1）品牌设计｜上海｜社招"]
+    });
   });
 });

@@ -223,6 +223,13 @@ textarea {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.helperText {
+  color: #7d6c59;
+  font-size: 11px;
+  line-height: 1.55;
+  margin: 0;
+}
+
 .inspectionSummary {
   background: #f7f1e8;
   border-radius: 6px;

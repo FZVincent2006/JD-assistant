@@ -84,8 +84,8 @@ describe("Feishu phased OpenAPI writer", () => {
     "not-editable",
     "accessibility-not-granted",
     "unsupported-front-app",
-    "web-area-not-found",
-    "web-area-not-focused",
+    "web-area-missing",
+    "web-area-focus-failed",
     "native-event-failed"
   ])("classifies deterministic page-numbering failure %s as partial", async (reason) => {
     const numberHeading = vi.fn().mockRejectedValue(pageNumberingError(reason));

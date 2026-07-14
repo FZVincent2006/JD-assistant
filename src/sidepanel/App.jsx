@@ -226,7 +226,9 @@ function App() {
     if (!confirmed) return;
     setWriting(true);
     setWriteResult(null);
-    setStatus("正在写入测试副本：先更新 JD 区，再更新岗位汇总区…");
+    setStatus(writePlan.mode === "resume-new-company"
+      ? "正在恢复测试副本：不重复写 JD，先确认公司标题自动编号，再补 Portfolio…"
+      : "正在写入测试副本：先更新 JD 区，再更新岗位汇总区…");
     try {
       const response = await sendFeishuWriteRequest(companyDraft);
       setWriteResult(response);
@@ -396,6 +398,9 @@ function FeishuAccessPanel({ authStatus, inspection, writing, onAuthorize, onIns
           检查测试副本
         </button>
       </div>
+      <p className="helperText">
+        首次使用需在 macOS“系统设置 → 隐私与安全性 → 辅助功能”中允许飞书授权助手；执行编号时请保持 Chrome 或 Edge 的测试副本在前台。
+      </p>
       {inspection && (
         <div className="inspectionSummary">
           <strong>文档版本 {inspection.revisionId}</strong>
@@ -463,7 +468,11 @@ function FeishuPreview({
       </button>
       <button className="primary" type="button" onClick={onWrite} disabled={!canWrite}>
         <Send size={16} />
-        {writing ? "正在写入…" : "确认并写入测试副本"}
+        {writing
+          ? "正在写入…"
+          : writePlan?.mode === "resume-new-company"
+            ? "确认并恢复测试副本"
+            : "确认并写入测试副本"}
       </button>
     </section>
   );
