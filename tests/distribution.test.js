@@ -6,6 +6,29 @@ function read(relativePath) {
 }
 
 describe("colleague distribution entry", () => {
+  it("gives colleagues one repository-to-Codex installation entry", () => {
+    const readme = read("README.md");
+    const protocol = read("CODEX_INSTALL.md");
+
+    expect(readme).toContain("让 Codex 安装");
+    expect(readme).toContain("https://github.com/FZVincent2006/JD-assistant");
+    expect(readme).toContain("CODEX_INSTALL.md");
+    expect(protocol).toContain("scripts/install-from-github.sh");
+    expect(protocol).toContain("STATUS=browser_confirmation_required");
+    expect(protocol).toContain("App Secret");
+    expect(protocol).toContain("mlhjjkclfiocgafhjdhoicghiabkeggg");
+  });
+
+  it("forbids unsafe shortcuts and unnecessary build prerequisites", () => {
+    const protocol = read("CODEX_INSTALL.md");
+
+    expect(protocol).not.toMatch(/curl\s+[^\n|]+\|\s*(?:ba)?sh/);
+    expect(protocol).toContain("不要安装 Node.js");
+    expect(protocol).toContain("不要修改浏览器 profile");
+    expect(protocol).toContain("只允许两次人工确认");
+    expect(protocol).toContain("不得在聊天中索取 App Secret");
+  });
+
   it("uses the bundled helper and fixed extension id without accessibility setup", () => {
     const installer = read("scripts/install-feishu-auth-helper.sh");
     const command = read("distribution/安装飞书授权助手.command");
