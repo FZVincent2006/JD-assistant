@@ -5,11 +5,10 @@ const REASONS = {
   "not-editable": "飞书测试副本当前不可编辑。",
   "heading-missing": "未找到待编号的新公司 Heading 1。",
   "heading-duplicate": "找到多个同名 Heading 1，已停止编号。",
-  "already-numbered": "目标公司 Heading 1 已经存在编号，未再次执行快捷键。",
-  "shortcut-rejected": "飞书编辑器未接受自动编号快捷键。"
+  "already-numbered": "目标公司 Heading 1 已经存在编号，未再次执行快捷键。"
 };
 
-export async function applyFeishuHeadingNumbering({
+export async function prepareFeishuHeadingNumbering({
   root = document,
   url = location.href,
   companyName,
@@ -28,15 +27,10 @@ export async function applyFeishuHeadingNumbering({
   const block = await revealCandidate(root, candidates[0], settle, maxSteps);
   const editor = block?.querySelector('[contenteditable="true"]');
   if (!block || !editor) return failure("heading-missing");
-  if (block.querySelector(".heading-order")) return failure("already-numbered");
+  if (block.querySelector(".heading-order")) return { ok: true, state: "already-numbered" };
 
   placeCaret(editor, root);
-  const KeyboardEventClass = root.defaultView?.KeyboardEvent ?? KeyboardEvent;
-  const event = { key: "7", code: "Digit7", metaKey: true, shiftKey: true, bubbles: true, cancelable: true };
-  editor.dispatchEvent(new KeyboardEventClass("keydown", event));
-  editor.dispatchEvent(new KeyboardEventClass("keyup", event));
-  await settle(300);
-  return block.querySelector(".heading-order") ? { ok: true } : failure("shortcut-rejected");
+  return { ok: true, state: "prepared" };
 }
 
 function failure(reason) {

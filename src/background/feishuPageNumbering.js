@@ -10,7 +10,7 @@ export class FeishuPageNumberingError extends Error {
 
 export function createFeishuPageNumbering({ chromeApi = chrome } = {}) {
   return {
-    async apply(companyName) {
+    async prepare(companyName) {
       const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id || !isTestFeishuDocument(tab.url)) {
         throw new FeishuPageNumberingError("当前活动标签页不是指定飞书测试副本。", "wrong-document");
@@ -18,7 +18,7 @@ export function createFeishuPageNumbering({ chromeApi = chrome } = {}) {
       let response;
       try {
         response = await chromeApi.tabs.sendMessage(tab.id, {
-          type: "FEISHU_APPLY_HEADING_NUMBERING",
+          type: "FEISHU_PREPARE_HEADING_NUMBERING",
           companyName
         });
       } catch {
@@ -27,7 +27,7 @@ export function createFeishuPageNumbering({ chromeApi = chrome } = {}) {
       if (!response?.ok) {
         throw new FeishuPageNumberingError(response?.error || "飞书页面自动编号失败。", response?.reason);
       }
-      return { ok: true };
+      return { ok: true, state: response.state === "already-numbered" ? "already-numbered" : "prepared" };
     }
   };
 }

@@ -7,10 +7,10 @@ if (!globalThis.__recruitingAssistantContentLoaded) {
   globalThis.__recruitingAssistantContentLoaded = true;
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === "FEISHU_APPLY_HEADING_NUMBERING") {
+    if (message?.type === "FEISHU_PREPARE_HEADING_NUMBERING") {
       handleFeishuHeadingNumberingMessage(message, { root: document, url: location.href })
         .then(sendResponse)
-        .catch(() => sendResponse({ ok: false, reason: "page-unavailable", error: "飞书页面自动编号失败。" }));
+        .catch(() => sendResponse({ ok: false, reason: "page-unavailable", error: "飞书页面编号准备失败。" }));
       return true;
     }
 

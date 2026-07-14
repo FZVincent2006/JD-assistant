@@ -35,7 +35,8 @@ describe("Feishu service-worker messages", () => {
     };
     const current = createFeishuBackgroundServices({ chromeApi, fetchImpl: vi.fn() });
 
-    expect(current.pageNumbering).toEqual({ apply: expect.any(Function) });
+    expect(current.pageNumbering).toEqual({ prepare: expect.any(Function) });
+    expect(current.nativeNumbering).toEqual({ apply: expect.any(Function) });
   });
 
   it("routes auth lifecycle messages without returning an access token", async () => {
