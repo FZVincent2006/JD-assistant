@@ -3,7 +3,7 @@ import { BLOCK, fieldForBlockType } from "./feishuBlockModel.js";
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 export function renderJdDescendants(draft, plan, templates) {
-  requirePlan(plan);
+  requirePlan(plan, ["new-company", "append-jobs"]);
   requireTemplate(templates?.companyHeading, BLOCK.HEADING1, "company Heading 1");
   requireTemplate(templates?.subheading, BLOCK.HEADING2, "gray Heading 2");
   requireOneOfTemplates(templates?.openHeading, [BLOCK.HEADING1, BLOCK.HEADING2], "gray open-jobs Heading");
@@ -65,13 +65,13 @@ export function renderJdDescendants(draft, plan, templates) {
 }
 
 export function renderSummaryDescendants(draft, plan, templates) {
-  requirePlan(plan);
+  requirePlan(plan, ["new-company", "append-jobs", "resume-new-company"]);
   requireTemplate(templates?.company, BLOCK.HEADING3, "Portfolio company Heading 3");
   requireTemplate(templates?.bullet, BLOCK.BULLET, "Portfolio job Bullet");
   const childrenId = [];
   const descendants = [];
 
-  if (plan.mode === "new-company") {
+  if (isNewCompanyMode(plan.mode)) {
     addRoot(childrenId, descendants, textBlock(
       "summary-company",
       templates.company,
@@ -171,14 +171,18 @@ function safeHttpUrl(value) {
   return raw;
 }
 
-function requirePlan(plan) {
+function requirePlan(plan, allowedModes) {
   if (!plan?.ok) throw new Error("Cannot render an invalid Feishu write plan");
-  if (!["new-company", "append-jobs"].includes(plan.mode)) {
+  if (!allowedModes.includes(plan.mode)) {
     throw new Error("Unknown Feishu write-plan mode");
   }
   if (!Array.isArray(plan.jobs) || !plan.jobs.length) {
     throw new Error("A Feishu write plan must contain at least one job");
   }
+}
+
+function isNewCompanyMode(mode) {
+  return mode === "new-company" || mode === "resume-new-company";
 }
 
 function requireTemplate(template, blockType, label) {

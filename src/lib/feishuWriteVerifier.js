@@ -14,10 +14,10 @@ export function verifyJdWrite(snapshot = {}, plan = {}, { requireNumbering = tru
   if (company.parentBlockId !== snapshot.rootId || invalidOptionalType(company.blockType, BLOCK.HEADING1)) {
     errors.push(`公司“${plan.companyName}”必须是文档根级 Heading 1。`);
   }
-  if (requireNumbering && plan.mode === "new-company" && company.headingSequence !== "auto") {
+  if (requireNumbering && isNewCompanyMode(plan.mode) && company.headingSequence !== "auto") {
     errors.push(`公司“${plan.companyName}”的 Heading 1 未启用飞书自动编号。`);
   }
-  if (plan.mode === "new-company" && company.index !== plan.jdTarget?.index) {
+  if (isNewCompanyMode(plan.mode) && company.index !== plan.jdTarget?.index) {
     errors.push("新公司 Heading 1 不在计划位置。");
   }
   if (!company.introHeadingBlockId || invalidOptionalType(company.introHeadingBlockType, BLOCK.HEADING2)) {
@@ -55,7 +55,7 @@ export function verifySummaryWrite(snapshot = {}, plan = {}) {
   if (invalidOptionalType(company.blockType, BLOCK.HEADING3)) {
     errors.push("Portfolio 公司块不是预期的 Heading 3。");
   }
-  if (plan.mode === "new-company" && company.index !== plan.summaryTarget?.index) {
+  if (isNewCompanyMode(plan.mode) && company.index !== plan.summaryTarget?.index) {
     errors.push("Portfolio 新公司不在计划位置。");
   }
 
@@ -88,7 +88,7 @@ function verifyPlannedJdJobs(jobs, plan, errors) {
     if (normalizeForMatch(persisted.text) !== normalizeForMatch(expectedText)) {
       errors.push(`岗位“${planned.title}”的标题文本不完整。`);
     }
-    const expectedIndex = plan.mode === "new-company"
+    const expectedIndex = isNewCompanyMode(plan.mode)
       ? plan.jdTarget.index + 4 + (plannedIndex * 2)
       : plan.jdTarget.index + (plannedIndex * 2);
     if (persisted.index !== expectedIndex) {
@@ -112,7 +112,7 @@ function verifyPlannedSummaryJobs(jobs, plan, errors) {
     if (normalizeForMatch(persisted.text) !== normalizeForMatch(expectedText)) {
       errors.push(`岗位“${planned.title}”的 Portfolio Bullet 完整文本不正确。`);
     }
-    const expectedIndex = plan.mode === "new-company"
+    const expectedIndex = isNewCompanyMode(plan.mode)
       ? plan.summaryTarget.index + 1 + plannedIndex
       : plan.summaryTarget.index + plannedIndex;
     if (persisted.index !== expectedIndex) {
@@ -124,6 +124,10 @@ function verifyPlannedSummaryJobs(jobs, plan, errors) {
 function matchingCompanies(companies = [], companyName) {
   const normalized = normalizeForMatch(companyName);
   return companies.filter((company) => normalizeForMatch(company.name) === normalized);
+}
+
+function isNewCompanyMode(mode) {
+  return mode === "new-company" || mode === "resume-new-company";
 }
 
 function invalidOptionalType(value, expected) {

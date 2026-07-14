@@ -4,6 +4,10 @@ import { buildBlockModel, fieldForBlockType } from "../src/lib/feishuBlockModel.
 import { renderJdDescendants, renderSummaryDescendants } from "../src/lib/feishuBlockRenderer.js";
 import { buildFeishuOpenApiPlan } from "../src/lib/feishuOpenApiPlan.js";
 import { inspectRecruitingDocument } from "../src/lib/feishuTemplateReader.js";
+import {
+  draft as resumeDraft,
+  successfulSnapshots
+} from "./helpers/feishuWriteScenario.js";
 
 const draft = {
   companyName: "CoFANCY <可糖>",
@@ -123,6 +127,24 @@ describe("Feishu native block rendering", () => {
     const plainRequest = renderSummaryDescendants(plainDraft, setup(plainDraft).plan, snapshot.templates.portfolio);
     const plainCompany = blockMap(plainRequest).get(plainRequest.children_id[0]);
     expect(plainCompany.heading3.elements[0].text_run.text_element_style).not.toHaveProperty("link");
+  });
+
+  it("renders the complete Portfolio company block for an exact JD-only recovery", () => {
+    const { unnumberedJd } = successfulSnapshots();
+    const plan = buildFeishuOpenApiPlan(unnumberedJd, resumeDraft);
+
+    const request = renderSummaryDescendants(
+      resumeDraft,
+      plan,
+      unnumberedJd.templates.portfolio
+    );
+
+    expect(plan.mode).toBe("resume-new-company");
+    expect(request.children_id).toEqual([
+      "summary-company",
+      "summary-job-1",
+      "summary-job-2"
+    ]);
   });
 
   it("uses one 待补充 bullet for a missing introduction and keeps HTML-like input as plain text", () => {

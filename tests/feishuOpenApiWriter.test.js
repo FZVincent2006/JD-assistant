@@ -28,13 +28,14 @@ function writerSetup({ snapshots, request, numberHeading = vi.fn().mockResolvedV
   };
 }
 
-function pageNumberingError(reason) {
+function pageNumberingError(reason, ambiguous = false) {
   return Object.assign(new Error(`page numbering failed: ${reason}`), {
     stage: "jd-numbering-page",
     reason,
     status: 0,
     code: 0,
-    logId: ""
+    logId: "",
+    ambiguous
   });
 }
 
@@ -80,8 +81,12 @@ describe("Feishu phased OpenAPI writer", () => {
     "wrong-document",
     "heading-missing",
     "heading-duplicate",
-    "already-numbered",
-    "not-editable"
+    "not-editable",
+    "accessibility-not-granted",
+    "unsupported-front-app",
+    "web-area-not-found",
+    "web-area-not-focused",
+    "native-event-failed"
   ])("classifies deterministic page-numbering failure %s as partial", async (reason) => {
     const numberHeading = vi.fn().mockRejectedValue(pageNumberingError(reason));
     const { writer, client, inspect } = writerSetup({
@@ -101,13 +106,109 @@ describe("Feishu phased OpenAPI writer", () => {
     expect(inspect).toHaveBeenCalledTimes(2);
   });
 
-  it.each([
-    "shortcut-rejected",
-    "page-unavailable"
-  ])("classifies ambiguous page-numbering failure %s as unknown", async (reason) => {
-    const numberHeading = vi.fn().mockRejectedValue(pageNumberingError(reason));
-    const { writer, client, inspect } = writerSetup({
-      numberHeading
+  it("resumes an exact JD-only write without creating the JD twice", async () => {
+    const values = successfulSnapshots();
+    for (const snapshot of [values.unnumberedJd, values.jd, values.complete]) {
+      snapshot.documentId = "doc-test";
+    }
+    const inspect = vi.fn()
+      .mockResolvedValueOnce(values.unnumberedJd)
+      .mockResolvedValueOnce(values.jd)
+      .mockResolvedValueOnce(values.complete);
+    const request = vi.fn().mockResolvedValue({});
+    const numberHeading = vi.fn().mockResolvedValue({ ok: true });
+    const writer = createFeishuOpenApiWriter({
+      client: { request },
+      inspect,
+      numberHeading,
+      wait: vi.fn().mockResolvedValue(undefined)
+    });
+
+    const result = await writer.write(draft);
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "success",
+      mode: "resume-new-company",
+      completedStages: ["jd", "summary"]
+    });
+    expect(numberHeading).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0][1]).toMatchObject({
+      query: { document_revision_id: values.jd.revisionId },
+      body: { index: values.plan.summaryTarget.index },
+      stage: "summary-write"
+    });
+    expect(inspect).toHaveBeenCalledTimes(3);
+  });
+
+  it("skips the native shortcut when an exact JD-only recovery is already numbered", async () => {
+    const values = successfulSnapshots();
+    values.jd.documentId = "doc-test";
+    values.complete.documentId = "doc-test";
+    const inspect = vi.fn()
+      .mockResolvedValueOnce(values.jd)
+      .mockResolvedValueOnce(values.complete);
+    const request = vi.fn().mockResolvedValue({});
+    const numberHeading = vi.fn();
+    const writer = createFeishuOpenApiWriter({
+      client: { request },
+      inspect,
+      numberHeading,
+      wait: vi.fn().mockResolvedValue(undefined)
+    });
+
+    await expect(writer.write(draft)).resolves.toMatchObject({
+      ok: true,
+      mode: "resume-new-company"
+    });
+    expect(numberHeading).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(inspect).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues after an ambiguous native result when OpenAPI proves numbering succeeded", async () => {
+    const values = successfulSnapshots();
+    for (const snapshot of [values.unnumberedJd, values.jd, values.complete]) {
+      snapshot.documentId = "doc-test";
+    }
+    const inspect = vi.fn()
+      .mockResolvedValueOnce(values.unnumberedJd)
+      .mockResolvedValueOnce(values.jd)
+      .mockResolvedValueOnce(values.complete);
+    const request = vi.fn().mockResolvedValue({});
+    const numberHeading = vi.fn().mockRejectedValue(
+      pageNumberingError("native-result-unknown", true)
+    );
+    const writer = createFeishuOpenApiWriter({
+      client: { request },
+      inspect,
+      numberHeading,
+      wait: vi.fn().mockResolvedValue(undefined)
+    });
+
+    await expect(writer.write(draft)).resolves.toMatchObject({
+      ok: true,
+      mode: "resume-new-company"
+    });
+    expect(numberHeading).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(inspect).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports unknown and never resends when an ambiguous native result stays unnumbered", async () => {
+    const values = successfulSnapshots();
+    values.unnumberedJd.documentId = "doc-test";
+    const inspect = vi.fn().mockResolvedValue(values.unnumberedJd);
+    const request = vi.fn().mockResolvedValue({});
+    const numberHeading = vi.fn().mockRejectedValue(
+      pageNumberingError("native-result-unknown", true)
+    );
+    const writer = createFeishuOpenApiWriter({
+      client: { request },
+      inspect,
+      numberHeading,
+      wait: vi.fn().mockResolvedValue(undefined)
     });
 
     const result = await writer.write(draft);
@@ -116,13 +217,13 @@ describe("Feishu phased OpenAPI writer", () => {
       ok: false,
       status: "unknown",
       completedStages: [],
-      failedStage: "jd-numbering-page"
+      failedStage: "jd-numbering-page",
+      reason: "native-result-unknown"
     });
     expect(result.repairHint).toContain("不要重复提交");
-    expect(result.repairHint).toContain("测试副本");
-    expect(numberHeading).toHaveBeenCalledOnce();
-    expect(client.request).toHaveBeenCalledTimes(1);
-    expect(inspect).toHaveBeenCalledTimes(2);
+    expect(numberHeading).toHaveBeenCalledTimes(1);
+    expect(request).not.toHaveBeenCalled();
+    expect(inspect).toHaveBeenCalledTimes(6);
   });
 
   it("reports JD-only partial success when summary creation fails", async () => {

@@ -57,6 +57,16 @@ describe("Feishu persisted-write verification", () => {
     });
   });
 
+  it("requires automatic numbering and verifies both sections during JD-only recovery", () => {
+    const { unnumberedJd, jd, complete } = successfulSnapshots();
+    const plan = buildFeishuOpenApiPlan(unnumberedJd, draft);
+
+    expect(plan.mode).toBe("resume-new-company");
+    expect(verifyJdWrite(unnumberedJd, plan).errors.join(" ")).toContain("自动编号");
+    expect(verifyJdWrite(jd, plan)).toEqual({ ok: true, errors: [] });
+    expect(verifySummaryWrite(complete, plan)).toEqual({ ok: true, errors: [] });
+  });
+
   it("rejects wrong job counts, ordinals, title text, and root sibling positions", () => {
     const { plan, jd } = successfulSnapshots();
     jd.jd.companies[0].jobs.pop();

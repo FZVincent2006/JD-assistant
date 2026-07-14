@@ -3,8 +3,6 @@ import { TEST_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
 import { buildFeishuOpenApiPlan, normalizeForMatch } from "../lib/feishuOpenApiPlan.js";
 import { verifyJdWrite, verifySummaryWrite } from "../lib/feishuWriteVerifier.js";
 
-const AMBIGUOUS_PAGE_NUMBERING_REASONS = new Set(["shortcut-rejected", "page-unavailable"]);
-
 export function createFeishuOpenApiWriter({ client, inspect, numberHeading, wait = defaultWait }) {
   if (typeof client?.request !== "function") throw new TypeError("A Feishu API client is required");
   if (typeof inspect !== "function") throw new TypeError("A Feishu inspect function is required");
@@ -61,7 +59,9 @@ async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
   let jdRequest;
   let summaryRequest;
   try {
-    jdRequest = renderJdDescendants(draft, plan, initial.templates.jd);
+    if (plan.mode !== "resume-new-company") {
+      jdRequest = renderJdDescendants(draft, plan, initial.templates.jd);
+    }
     summaryRequest = renderSummaryDescendants(draft, plan, initial.templates.portfolio);
   } catch {
     return makeResult({
@@ -74,51 +74,53 @@ async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
   }
 
   const completedStages = [];
-  let afterJd;
-  let jdApiSucceeded = false;
-  try {
-    await createDescendants(client, initial.documentId, plan.jdTarget, plan.baseRevisionId, jdRequest, "jd-write");
-    jdApiSucceeded = true;
-    await wait(400);
-    afterJd = await inspect();
-  } catch (error) {
-    if (jdApiSucceeded) {
-      return makeResult({
-        draft,
-        plan,
-        completedStages,
-        status: "unknown",
-        failedStage: "jd-verify",
-        repairHint: "岗位 JD 写入已被 API 接受但无法回读；不要重复提交，请先人工检查测试副本。"
-      });
-    }
-    if (!isAmbiguousNetworkError(error)) {
-      return failedForError({ draft, plan, completedStages, stage: "jd-write", error });
-    }
-    await wait(400);
+  let afterJd = initial;
+  if (plan.mode !== "resume-new-company") {
+    let jdApiSucceeded = false;
     try {
+      await createDescendants(client, initial.documentId, plan.jdTarget, plan.baseRevisionId, jdRequest, "jd-write");
+      jdApiSucceeded = true;
+      await wait(400);
       afterJd = await inspect();
-    } catch {
-      return failedForError({
-        draft,
-        plan,
-        completedStages,
-        stage: "jd-write",
-        error,
-        status: "unknown",
-        repairHint: "岗位 JD 写入请求状态未知且无法回读；不要重复提交，请先人工检查测试副本。"
-      });
-    }
-    const timeoutVerification = verifyJdWrite(afterJd, plan, { requireNumbering: false });
-    if (!timeoutVerification.ok) {
-      return failedForError({
-        draft,
-        plan,
-        completedStages,
-        stage: "jd-write",
-        error,
-        repairHint: `回读未发现完整的岗位 JD 写入：${timeoutVerification.errors.join("；")}`
-      });
+    } catch (error) {
+      if (jdApiSucceeded) {
+        return makeResult({
+          draft,
+          plan,
+          completedStages,
+          status: "unknown",
+          failedStage: "jd-verify",
+          repairHint: "岗位 JD 写入已被 API 接受但无法回读；不要重复提交，请先人工检查测试副本。"
+        });
+      }
+      if (!isAmbiguousNetworkError(error)) {
+        return failedForError({ draft, plan, completedStages, stage: "jd-write", error });
+      }
+      await wait(400);
+      try {
+        afterJd = await inspect();
+      } catch {
+        return failedForError({
+          draft,
+          plan,
+          completedStages,
+          stage: "jd-write",
+          error,
+          status: "unknown",
+          repairHint: "岗位 JD 写入请求状态未知且无法回读；不要重复提交，请先人工检查测试副本。"
+        });
+      }
+      const timeoutVerification = verifyJdWrite(afterJd, plan, { requireNumbering: false });
+      if (!timeoutVerification.ok) {
+        return failedForError({
+          draft,
+          plan,
+          completedStages,
+          stage: "jd-write",
+          error,
+          repairHint: `回读未发现完整的岗位 JD 写入：${timeoutVerification.errors.join("；")}`
+        });
+      }
     }
   }
 
@@ -135,27 +137,43 @@ async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
   }
 
   let numberingAttempted = false;
-  if (plan.mode === "new-company" && !hasAutomaticHeadingNumbering(afterJd, plan.companyName)) {
+  if (isNewCompanyMode(plan.mode) && !hasAutomaticHeadingNumbering(afterJd, plan.companyName)) {
     numberingAttempted = true;
+    let numberingVerified = false;
     try {
       await numberHeading(plan.companyName);
     } catch (error) {
-      const numberingStateUnknown = AMBIGUOUS_PAGE_NUMBERING_REASONS.has(error?.reason);
-      return failedForError({
-        draft,
-        plan,
-        completedStages,
-        stage: "jd-numbering-page",
-        error,
-        status: numberingStateUnknown ? "unknown" : "partial",
-        repairHint: numberingStateUnknown
-          ? "岗位 JD 内容已写入，但飞书页面自动编号结果未知；不要重复提交，请先人工检查测试副本。"
-          : error?.message || "岗位 JD 内容已写入，但飞书页面自动编号失败；已停止 Portfolio 写入。"
-      });
+      if (!error?.ambiguous) {
+        return failedForError({
+          draft,
+          plan,
+          completedStages,
+          stage: "jd-numbering-page",
+          error,
+          status: "partial",
+          repairHint: numberingRepairHint(error)
+        });
+      }
+      const readBack = await waitForNumberedJd({ inspect, wait, plan, attempts: 5 });
+      if (!readBack) {
+        return failedForError({
+          draft,
+          plan,
+          completedStages,
+          stage: "jd-numbering-page",
+          error,
+          status: "unknown",
+          repairHint: "本机编号结果未知且 OpenAPI 未确认自动编号；不要重复提交，请先人工检查测试副本。"
+        });
+      }
+      afterJd = readBack;
+      numberingVerified = true;
     }
 
-    afterJd = await waitForNumberedJd({ inspect, wait, plan, attempts: 5 });
-    if (!afterJd) {
+    if (!numberingVerified) {
+      afterJd = await waitForNumberedJd({ inspect, wait, plan, attempts: 5 });
+    }
+    if (!afterJd || !verifyJdWrite(afterJd, plan).ok) {
       return makeResult({
         draft,
         plan,
@@ -338,12 +356,30 @@ function makeResult({
     errorCode: Number.isFinite(error?.code) ? error.code : 0,
     httpStatus: Number.isFinite(error?.status) ? error.status : 0,
     logId: typeof error?.logId === "string" ? error.logId : "",
+    reason: typeof error?.reason === "string" ? error.reason : "",
     repairHint
   };
 }
 
 function isAmbiguousNetworkError(error) {
   return error?.status === 0 && error?.code === 0;
+}
+
+function isNewCompanyMode(mode) {
+  return mode === "new-company" || mode === "resume-new-company";
+}
+
+function numberingRepairHint(error) {
+  const hints = {
+    "accessibility-not-granted": "未获得 macOS 辅助功能权限；请在系统设置中允许飞书授权助手控制电脑，然后重试。",
+    "unsupported-front-app": "当前最前方不是受支持的 Chrome 或 Edge；请打开测试副本并保持浏览器在前台。",
+    "web-area-not-found": "未在当前浏览器窗口找到测试副本页面；请打开固定测试副本后重试。",
+    "web-area-not-focused": "无法把焦点放到测试副本文档；请点击文档页面后重试。",
+    "native-event-failed": "本机未能发送固定的自动编号快捷键；已停止 Portfolio 写入。"
+  };
+  return hints[error?.reason]
+    ?? error?.message
+    ?? "岗位 JD 内容已写入，但飞书页面自动编号失败；已停止 Portfolio 写入。";
 }
 
 function defaultWait(milliseconds) {
