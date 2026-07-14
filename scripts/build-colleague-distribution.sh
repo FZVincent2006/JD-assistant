@@ -3,11 +3,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DATE="${BUILD_DATE:-20260714}"
+BUILD_DATE="${BUILD_DATE:-$(/bin/date -u +%Y%m%d)}"
+[[ "$BUILD_DATE" =~ ^[0-9]{8}$ ]] || {
+  printf '%s\n' "BUILD_DATE must use YYYYMMDD." >&2
+  exit 2
+}
 PACKAGE_NAME="招聘JD发布助手-macOS-$BUILD_DATE"
+ZIP_NAME="JD-assistant-macOS-$BUILD_DATE.zip"
 RELEASE_DIR="$ROOT_DIR/release"
 PACKAGE_DIR="$RELEASE_DIR/$PACKAGE_NAME"
-ZIP_PATH="$RELEASE_DIR/$PACKAGE_NAME.zip"
+ZIP_PATH="$RELEASE_DIR/$ZIP_NAME"
 HELPER_APP="$ROOT_DIR/native-helper/.build/universal/Feishu JD Assistant Helper.app"
 
 cd "$ROOT_DIR"

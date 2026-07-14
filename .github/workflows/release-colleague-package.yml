@@ -1,0 +1,55 @@
+name: Release colleague package
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v* tag to package and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: macos-latest
+    steps:
+      - name: Validate release tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || {
+            printf '%s\n' "Tag must start with v and contain only release-safe characters." >&2
+            exit 2
+          }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build and verify universal package
+        run: BUILD_DATE="$(date -u +%Y%m%d)" scripts/build-colleague-distribution.sh
+
+      - name: Upload verified package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          assets=(release/JD-assistant-macOS-*.zip)
+          [[ "${#assets[@]}" -eq 1 && -f "${assets[0]}" ]] || {
+            printf '%s\n' "Expected exactly one JD-assistant macOS archive." >&2
+            exit 1
+          }
+          asset="${assets[0]}"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$TAG" --prerelease --title "$TAG"
+          gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
