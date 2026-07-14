@@ -22,3 +22,18 @@ func expectThrows(_ name: String, _ body: () throws -> Void) throws {
     }
     throw TestFailure.expectation(name)
 }
+
+func expectThrowsEqual<T: Error & Equatable>(
+    _ expected: T,
+    _ body: () throws -> Void
+) throws {
+    do {
+        try body()
+    } catch let actual as T {
+        try expect(actual == expected, "expected \(expected), got \(actual)")
+        return
+    } catch {
+        throw TestFailure.expectation("expected \(expected), got \(error)")
+    }
+    throw TestFailure.expectation("expected \(expected) to be thrown")
+}

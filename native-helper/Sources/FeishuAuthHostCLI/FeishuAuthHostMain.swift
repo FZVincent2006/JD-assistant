@@ -6,6 +6,14 @@ import Foundation
 struct FeishuAuthHostMain {
     static func main() async {
         let arguments = Array(CommandLine.arguments.dropFirst())
+        if arguments == ["--check-accessibility"] {
+            exit(MacHeadingEnvironment().hasPostEventAccess(prompt: false) ? 0 : 1)
+        }
+
+        if arguments == ["--request-accessibility"] {
+            exit(MacHeadingEnvironment().hasPostEventAccess(prompt: true) ? 0 : 1)
+        }
+
         if arguments.first == "--configure-secret" {
             guard
                 arguments.count == 3,
@@ -47,7 +55,11 @@ struct FeishuAuthHostMain {
             exit(1)
         }
         do {
-            try await runNativeHost(input: input, output: output)
+            try await runNativeHost(
+                input: input,
+                output: output,
+                headingNumberer: MacHeadingNumberer()
+            )
         } catch {
             exit(1)
         }
