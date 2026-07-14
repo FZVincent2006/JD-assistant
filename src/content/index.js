@@ -1,11 +1,19 @@
 import { fillRecruitingForm } from "./formFiller.js";
 import { collectPageDiagnostics } from "./diagnostics.js";
 import { collectClickRecording, startClickRecording, stopClickRecording } from "./clickRecorder.js";
+import { handleFeishuHeadingNumberingMessage } from "./feishuHeadingMessages.js";
 
 if (!globalThis.__recruitingAssistantContentLoaded) {
   globalThis.__recruitingAssistantContentLoaded = true;
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "FEISHU_APPLY_HEADING_NUMBERING") {
+      handleFeishuHeadingNumberingMessage(message, { root: document, url: location.href })
+        .then(sendResponse)
+        .catch(() => sendResponse({ ok: false, reason: "page-unavailable", error: "飞书页面自动编号失败。" }));
+      return true;
+    }
+
     if (message?.type === "RECRUITING_ASSISTANT_DIAGNOSE") {
       sendResponse({ ok: true, diagnostics: collectPageDiagnostics(document) });
       return false;

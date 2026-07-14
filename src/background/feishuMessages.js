@@ -4,6 +4,7 @@ import { inspectRecruitingDocument } from "../lib/feishuTemplateReader.js";
 import { createFeishuApiClient } from "./feishuApiClient.js";
 import { createFeishuAuth } from "./feishuAuth.js";
 import { createFeishuOpenApiWriter } from "./feishuOpenApiWriter.js";
+import { createFeishuPageNumbering } from "./feishuPageNumbering.js";
 import { resolveFixedTestDocument } from "./feishuWikiResolver.js";
 
 const FEISHU_MESSAGE_TYPES = new Set([
@@ -38,8 +39,13 @@ export function createFeishuBackgroundServices({ chromeApi = chrome, fetchImpl =
       title: document.title
     };
   };
-  const writer = createFeishuOpenApiWriter({ client, inspect });
-  return { auth, client, inspect, writer };
+  const pageNumbering = createFeishuPageNumbering({ chromeApi });
+  const writer = createFeishuOpenApiWriter({
+    client,
+    inspect,
+    numberHeading: pageNumbering.apply
+  });
+  return { auth, client, inspect, writer, pageNumbering };
 }
 
 export async function handleFeishuBackgroundMessage(message, services) {

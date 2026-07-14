@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   classifyFeishuInspectionFailure,
+  createFeishuBackgroundServices,
   handleFeishuBackgroundMessage,
   registerFeishuBackgroundMessages,
   toPublicFeishuError
@@ -27,6 +28,16 @@ function services(overrides = {}) {
 }
 
 describe("Feishu service-worker messages", () => {
+  it("exposes page numbering through the shared background services", () => {
+    const chromeApi = {
+      storage: { session: {} },
+      tabs: { query: vi.fn(), sendMessage: vi.fn() }
+    };
+    const current = createFeishuBackgroundServices({ chromeApi, fetchImpl: vi.fn() });
+
+    expect(current.pageNumbering).toEqual({ apply: expect.any(Function) });
+  });
+
   it("routes auth lifecycle messages without returning an access token", async () => {
     const current = services();
 
