@@ -16,12 +16,14 @@ afterEach(async () => {
   await Promise.all(homes.splice(0).map((home) => rm(home, { recursive: true, force: true })));
 });
 
-async function runInstallerDryRun(origins) {
+async function runInstallerDryRun(origins, options = []) {
   const home = await mkdtemp(path.join(tmpdir(), "feishu-helper-test-"));
   homes.push(home);
-  const { stdout, stderr } = await execFileAsync("bash", [installer, "--dry-run", ...origins], {
-    env: { ...process.env, HOME: home }
-  });
+  const { stdout, stderr } = await execFileAsync(
+    "bash",
+    [installer, "--dry-run", ...options, ...origins],
+    { env: { ...process.env, HOME: home } }
+  );
   return { output: JSON.parse(stdout), stderr, home };
 }
 
@@ -52,5 +54,20 @@ describe("Feishu native helper installer", () => {
     expect(script).not.toContain("--request-accessibility");
     expect(script).not.toMatch(/tccutil|ScreenCapture|Input Monitoring/i);
     expect(script).toContain("Feishu JD Assistant Helper.app");
+  });
+
+  it("declares preserve-or-configure secret behavior for colleague installs", async () => {
+    const { output } = await runInstallerDryRun(
+      [CHROME_ORIGIN],
+      ["--keep-existing-secret"]
+    );
+
+    expect(output.secretPolicy).toBe("keep-existing-or-configure");
+  });
+
+  it("keeps explicit replacement as the default administrator behavior", async () => {
+    const { output } = await runInstallerDryRun([CHROME_ORIGIN]);
+
+    expect(output.secretPolicy).toBe("configure");
   });
 });
