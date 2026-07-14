@@ -1,68 +1,191 @@
 # 招聘 JD 发布助手
 
-Edge/Chrome 扩展，用于在 Boss 直聘或脉脉发布职位页粘贴 JD、解析字段，并自动填入当前页面。最后的发布按钮保留人工点击。
+## 让 Codex 安装（同事推荐入口）
 
-## 本地使用
+把下面整段发给同事电脑上的 Codex：
 
-1. 运行 `npm install`
-2. 运行 `npm run build`
-3. 打开 Edge 扩展管理页：`edge://extensions`
-4. 开启“开发人员模式”
-5. 点击“加载解压缩的扩展”，选择本项目的 `dist` 目录
-6. 打开 Boss 直聘或脉脉发布职位页，点击扩展图标打开侧边栏
+```text
+请安装这个仓库中的招聘 JD 发布助手：
+https://github.com/FZVincent2006/JD-assistant
+按照仓库的 CODEX_INSTALL.md 执行。除 App Secret 和浏览器安全确认外，其余步骤请自动完成并验证。
+```
+
+同事不需要安装 Node.js、Git、Swift 或 Xcode，也不需要手动下载构建产物。Codex 会按照 [CODEX_INSTALL.md](CODEX_INSTALL.md) 下载并校验固定 GitHub Release、安装本机授权助手，然后把稳定扩展目录交给 Chrome/Edge。人工只在首次安装时隐藏输入 App Secret，并在浏览器中确认加载扩展；重装默认保留 Keychain 中已有的 Secret。
+
+macOS 上的 Chrome/Edge 扩展，用于解析招聘 JD，并自动填入 Boss 直聘、脉脉，或通过飞书 OpenAPI 更新固定的正式招聘文档。
+
+- Boss/脉脉沿用原有页面填充逻辑，最后的发布按钮仍由人工点击。
+- 飞书采用“授权 → 检查 → 生成计划 → 人工确认 → 分阶段写入 → API 回读校验”的流程。
+- 飞书只允许写入正式招聘文档：<https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d>。
+- 扩展只通过飞书 OpenAPI 读写这个固定正式文档，不提供测试/正式切换，不向飞书页面注入脚本，也不会发送自动编号快捷键。
+
+## 当前能力
+
+- 解析一家公司的公司名、官网、公司介绍和多个岗位。
+- 预览并编辑岗位名称、地点、招聘类型、工作内容、职位要求和可选加分项。
+- 新公司同时置顶 Portfolio 汇总和岗位 JD；老公司只在原分组末尾追加岗位。
+- 若完整 JD 已存在但 Portfolio 尚未写入，只有逐字段、逐条目完全匹配时才生成 `resume-new-company` 恢复计划；恢复不会重复写入 JD。
+- 岗位 JD 使用飞书原生块：根级 Heading 1 公司名、灰色 Heading 2、公司介绍 Callout、岗位标题和 QuoteContainer。
+- 先写岗位 JD，回读校验成功后才写 Portfolio；API 返回成功本身不视为完成。
+- 网络超时只回读一次，不重试写入；结果会区分成功、部分完成、失败和未知。
+- Boss/脉脉支持原有字段填充、iframe 回退、诊断和点击记录。
+
+## 飞书应用配置（管理员一次性）
+
+使用企业自建应用 `招聘 JD 发布助手`，App ID 为 `cli_aade4224b8789bef`。App Secret 不得写入仓库、`.env`、聊天或安装说明。
+
+飞书应用只需要以下三个用户身份权限：
+
+- `wiki:wiki:readonly`
+- `docx:document:readonly`
+- `docx:document:write_only`
+
+管理员还需要：
+
+1. 在应用可用范围中加入实际使用的四位同事，并发布新版本。
+2. 保留固定扩展 ID 对应的回调地址：
+
+   ```text
+   https://mlhjjkclfiocgafhjdhoicghiabkeggg.chromiumapp.org/feishu
+   ```
+
+3. 保留正式招聘文档对这四位同事的阅读和编辑权限。
+
+通过仓库推荐安装入口加载时，Chrome 和 Edge 都必须显示固定扩展 ID `mlhjjkclfiocgafhjdhoicghiabkeggg`。若显示其他 ID，应停止安装，而不是给飞书应用新增回调地址。
+
+## 开发构建
+
+要求 macOS 13+、Node.js，以及构建原生助手时可用的 Swift/Xcode Command Line Tools。
+
+```bash
+npm install
+cat > .env.local <<'ENV'
+VITE_FEISHU_APP_ID=cli_aade4224b8789bef
+VITE_FEISHU_AUTH_MODE=native
+ENV
+npm run build
+scripts/build-feishu-auth-helper.sh
+```
+
+`.env.local` 已被 Git 忽略。App ID 是公开标识；App Secret 只会在安装助手时通过隐藏输入写入当前 macOS 用户的 Keychain。
+
+## 四人安装（无服务器）
+
+推荐直接使用本文开头的“让 Codex 安装”入口。下面的步骤仅用于开发者手工排障，不应作为同事的日常安装流程。
+
+可以由一位开发者生成 `dist` 和 universal 原生助手，再通过内部安全渠道把同一份构建包发给四位同事；也可以每个人在本机执行上面的构建步骤。
+
+每台 Mac 的安装步骤：
+
+1. 在 `chrome://extensions` 或 `edge://extensions` 开启开发者模式。
+2. 选择“加载已解压的扩展程序”，加载 `dist`。
+3. 确认页面显示的扩展 ID 是 `mlhjjkclfiocgafhjdhoicghiabkeggg`；不一致时停止。
+4. 确认飞书应用已有固定回调地址，无需为不同电脑新增回调。
+5. 安装当前用户级原生助手。只使用一个浏览器时传一个 origin，同时使用两个浏览器时一起传入：
+
+   ```bash
+   scripts/install-feishu-auth-helper.sh \
+     chrome-extension://mlhjjkclfiocgafhjdhoicghiabkeggg/
+   ```
+
+6. 脚本提示时粘贴 App Secret 并回车。输入不可见；Secret 只保存到当前用户 Keychain，service 为 `cn.zhenfund.jd-assistant.feishu`。
+7. 完全退出并重新打开 Chrome/Edge，重新加载扩展，选择“飞书文档”，点击“授权飞书”。
+
+安装程序在用户目录中写入 Chrome 和 Edge 的 Native Messaging manifest，不需要管理员权限、后台服务、开放端口或常驻进程。
+
+本机助手只负责安全保存 App Secret 和交换飞书授权令牌，不控制浏览器页面，不需要“辅助功能”“屏幕录制”、输入监控、完全磁盘访问或管理员权限。Chrome 与 Edge 均使用固定扩展 ID；扩展管理页显示不一致即视为安装失败。
+
+重新授权的日常成本较低：短期 token 过期后只需在侧栏再次点击“授权飞书”并确认；Keychain 中的 App Secret 不需要重复输入。只有 App Secret 被轮换、扩展 ID 改变、删除 Keychain 项或重装助手时，才需要重新配置本机助手。
+
+卸载助手但保留 Keychain Secret：
+
+```bash
+scripts/install-feishu-auth-helper.sh --uninstall
+```
+
+同时删除本机 Keychain Secret：
+
+```bash
+scripts/install-feishu-auth-helper.sh --uninstall --delete-secret
+```
+
+## 飞书文档使用流程
+
+1. 打开扩展侧栏并选择“飞书文档”；正式招聘文档可以同时打开以便人工检查，但不需要保持为活动标签页。
+2. 点击“授权飞书”或“重新授权”。
+3. 点击“检查正式招聘文档”，确认能读取文档版本和两区公司数量。
+4. 粘贴并解析公司与岗位语料，检查可编辑预览字段。
+5. 生成计划并确认 `new-company`、`append-jobs` 或 `resume-new-company` 的位置与动作。
+6. 扩展通过 OpenAPI 创建并校验 JD，随后写入并校验 Portfolio；公司名保持为普通根级 Heading 1。
+7. 点击“确认并写入正式招聘文档”，在系统确认框中再次确认。
+8. 写入成功后，如需公司标题显示并自动维护 `1.` 序号，在飞书页面中手动为该 Heading 1 开启有序编号。
+
+`resume-new-company` 只用于恢复“JD 已完整写入、Portfolio 尚不存在”的中断状态。扩展会先确认现有公司位于 JD 首位，并逐项核对公司介绍、岗位顺序、序号、标题、地点、类型、工作内容、职位要求和加分项；任何差异都会停止。完全一致时，它跳过 JD 创建，直接写入并校验 Portfolio。
+
+推荐输入格式：
+
+```text
+CoFANCY 可糖
+公司介绍
+CoFANCY 可糖是一个高端角膜接触镜品牌。
+
+（1）品牌设计｜上海｜社招
+工作内容：
+- 建设品牌视觉。
+职位要求：
+- 具备 3 年左右设计经验。
+加分项：
+- 有美妆品牌经验。
+
+（2）销售主管/分销主管｜深圳｜社招
+工作内容：
+- 管理分销渠道。
+职位要求：
+- 具备 5 年以上销售经验。
+```
+
+官网缺失时公司名写纯文本；公司介绍缺失时写一个“待补充”项目；加分项缺失时不创建该段。
+
+## 正确写入验收标准
+
+新公司的 API 回读必须同时证明：
+
+- Portfolio 的 Callout 首位只有一个公司块，随后是所有岗位 Bullet。
+- “岗位JD整理”后的首家公司是根级 Heading 1，不嵌套在上一家公司中。
+- “公司介绍”和“开放岗位”是灰色 Heading 2。
+- 公司介绍内容位于 Callout 内。
+- 每个岗位标题是根级同级块；岗位正文位于紧随其后的 QuoteContainer 内。
+- 岗位序号、标题、地点、招聘类型、岗位数量和两个区域的岗位名全部一致。
+
+追加岗位时，还必须证明没有第二个同名公司块，岗位序号从现有最大序号加一，并且两个区域都追加在原公司分组末尾。
+
+## 部分成功或结果未知时
+
+扩展不会自动重试或撤销写入。
+
+- 显示“岗位 JD 区已确认写入”时，JD 已通过完整回读校验但 Portfolio 未完成；重新检查后，完全匹配的 `resume-new-company` 计划不会重复写 JD，只补 Portfolio。
+- “结果未知”表示写请求可能已经被服务器接受，但回读失败。不要再次点击写入；先人工打开正式招聘文档确认。
+- “岗位 JD 校验失败”时，Portfolio 不会继续写入。按提示检查公司 Heading 1、Callout、岗位标题和 QuoteContainer。
+- 修复或确认后重新点击“检查正式招聘文档”，再生成一份基于最新 revision 的计划。
+
+## Boss / 脉脉
+
+1. 打开 Boss 或脉脉职位发布页。
+2. 在侧栏选择对应平台，粘贴 JD 并解析。
+3. 检查字段后点击“填入当前页面”。
+4. 找不到字段时使用“诊断当前页面”或点击记录功能；最终发布仍由人工完成。
+
+飞书 OpenAPI 功能不修改 `src/lib/jdParser.js` 和 `src/content/formFiller.js`。构建前会校验这两个文件的基线哈希。
 
 ## JD Skill 安装
 
-仓库里同时保存了一个 Codex skill：`skills/jd-skill`。它用于把图片 JD、截图 JD 或 OCR 文本整理成插件可直接粘贴解析的长文本模板。
-
-在本机仓库目录里运行：
+仓库同时包含 `skills/jd-skill`，用于把 JD 图片、截图或 OCR 文本整理成插件可解析的模板。
 
 ```bash
 bash scripts/install-jd-skill.sh
 ```
 
-如果要发给另一个 Codex 自动安装，把下面这段话直接发给它即可：
-
-```text
-请帮我安装 JD Skill：
-1. 克隆这个仓库：https://github.com/FZVincent2006/JD-assistant
-2. 进入仓库目录
-3. 运行 bash scripts/install-jd-skill.sh
-4. 安装完成后告诉我安装路径，并提醒我重新打开 Codex 或新开一个 Codex 会话后使用 $jd-skill
-```
-
-如果仓库是 private，对方需要先拥有仓库访问权限，并在本机完成 GitHub 登录。
-
-安装后重新打开 Codex，或新开一个 Codex 会话，即可用 `$jd-skill` 处理 JD 图片。输出会保持固定模板：
-
-```text
-公司：<公司名或待补充>
-<岗位名称>｜<城市或base待定>｜<Full Time/社招/实习/待补充>
-
-公司介绍：
-- ...
-
-工作内容：
-- ...
-
-职位要求：
-- ...
-
-加分项：
-- ...
-```
-
-## 当前能力
-
-- 解析真格飞书 JD 常见标题格式：岗位名、城市、招聘类型
-- 识别岗位职责、任职要求、加分项、福利段落
-- 推断经验、学历和常见关键词
-- 填入 Boss 页面上的招聘类型、职位名称、职位描述、经验、学历、薪资、关键词、工作地址
-- 侧边栏顶部可手动选择「脉脉」或「Boss 直聘」，两套页面逻辑分开执行
-- 脉脉模式不自动填写职位类别；行业要求固定选择“不限行业”
-- 脉脉模式不自动填写职位关键词和职位亮点
-- 填入脉脉页面上的职位名称、职位描述、经验、学历、薪资、行业要求和普通职位属性，并尝试点击匹配的下拉选项
-- 找不到字段时在侧边栏状态中提示，发布动作由人工完成
+安装后重新打开 Codex 或新开会话，并使用 `$jd-skill`。
 
 ## 验证
 
@@ -70,3 +193,24 @@ bash scripts/install-jd-skill.sh
 npm test
 npm run build
 ```
+
+`npm run build` 会同时验证：
+
+- Boss/脉脉受保护文件哈希不变。
+- `dist/content.js` 没有 ES module import。
+- manifest 不含剪贴板或 `debugger` 权限，也不包含飞书页面 content script；运行时只接受固定正式招聘文档。
+- 原生构建包含 `nativeMessaging`，仅用于授权令牌交换，不参与页面定位或编号。
+- Boss/脉脉 host 和 content-script matches 完整保留。
+- 后台构建包含全部飞书授权、检查、计划和写入消息。
+
+## 回退
+
+稳定的 Boss/脉脉回退基线保存在分支 `codex/pre-feishu-openapi-baseline`。需要紧急停用飞书新功能时，在干净工作区执行：
+
+```bash
+git switch codex/pre-feishu-openapi-baseline
+npm install
+npm run build
+```
+
+不要用 `git reset --hard` 覆盖同事的未提交修改。

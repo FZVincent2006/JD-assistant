@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run",
-    "build": "vite build"
+    "verify:legacy": "node scripts/verify-legacy-integrity.mjs",
+    "test": "npm run verify:legacy && vitest run",
+    "build": "npm run verify:legacy && vite build && vite build --config vite.content.config.js && node scripts/verify-extension-build.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",

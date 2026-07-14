@@ -1,3 +1,7 @@
 node_modules/
 dist/
 .DS_Store
+.worktrees/
+.env.local
+.build/
+release/

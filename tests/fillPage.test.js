@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   collectClickRecording,
+  sendFeishuInspectRequest,
+  sendFeishuWriteRequest,
   sendDiagnosticRequest,
   sendFillRequest,
   startClickRecording
@@ -244,5 +246,31 @@ describe("sendFillRequest", () => {
         { frameId: 395, recording: { url: "https://www.zhipin.com/frame", logs: [{ type: "mousedown" }] } }
       ]
     });
+  });
+});
+
+describe("Feishu document requests", () => {
+  it("routes inspect and write through runtime messaging without an active Feishu tab", async () => {
+    const sendMessage = vi.fn()
+      .mockResolvedValueOnce({ ok: true, snapshot: { portfolioHeadingCount: 1, jdHeadingCount: 1 } })
+      .mockResolvedValueOnce({ ok: true, completed: ["jd", "summary"] });
+    const chromeApi = {
+      runtime: { sendMessage }
+    };
+
+    await expect(sendFeishuInspectRequest(chromeApi)).resolves.toMatchObject({ ok: true });
+    await expect(sendFeishuWriteRequest({ companyName: "Test" }, chromeApi)).resolves.toMatchObject({ ok: true });
+    expect(sendMessage).toHaveBeenNthCalledWith(1, { type: "FEISHU_INSPECT" });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, {
+      type: "FEISHU_WRITE",
+      payload: { companyName: "Test" }
+    });
+  });
+
+  it("returns a readable error when the background worker cannot be reached", async () => {
+    const chromeApi = { runtime: { sendMessage: vi.fn().mockRejectedValue(new Error("worker unavailable")) } };
+    const result = await sendFeishuInspectRequest(chromeApi);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("无法连接飞书自动化后台");
   });
 });

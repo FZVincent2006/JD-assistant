@@ -41,6 +41,27 @@ export async function sendFillRequest(payload, platform, chromeApi = chrome) {
   }
 }
 
+export async function sendFeishuInspectRequest(chromeApi = chrome) {
+  return sendFeishuRequest({ type: "FEISHU_INSPECT" }, chromeApi);
+}
+
+export async function sendFeishuWriteRequest(payload, chromeApi = chrome) {
+  return sendFeishuRequest({ type: "FEISHU_WRITE", payload }, chromeApi);
+}
+
+export async function sendFeishuRuntimeRequest(type, payload, chromeApi = chrome) {
+  const message = payload === undefined ? { type } : { type, payload };
+  return sendFeishuRequest(message, chromeApi);
+}
+
+async function sendFeishuRequest(message, chromeApi) {
+  try {
+    return await chromeApi.runtime.sendMessage(message);
+  } catch (error) {
+    return { ok: false, error: `无法连接飞书自动化后台。${readableError(error)}` };
+  }
+}
+
 export async function sendDiagnosticRequest(chromeApi = chrome) {
   const tab = await getActiveTab(chromeApi);
   if (!tab?.id || !isSupportedTab(tab.url)) {

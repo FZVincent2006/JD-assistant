@@ -88,7 +88,7 @@ textarea {
   border-radius: 8px;
   display: grid;
   gap: 4px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-bottom: 12px;
   padding: 4px;
 }
@@ -150,6 +150,173 @@ textarea {
 
 .description {
   min-height: 220px;
+}
+
+.compactTextArea {
+  min-height: 110px;
+}
+
+.environmentBadge {
+  background: #e7f1e8;
+  border: 1px solid #a9c9ae;
+  border-radius: 6px;
+  color: #38683e;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.documentTarget {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.documentTarget > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.documentTarget strong,
+.inspectionSummary strong,
+.planCard strong {
+  color: #5f452f;
+  font-size: 12px;
+}
+
+.documentTarget span {
+  color: #8b7967;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documentTarget .secondary {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.authState {
+  align-items: center;
+  background: #fff5dc;
+  border: 1px solid #e9ce86;
+  border-radius: 6px;
+  color: #75561b;
+  display: flex;
+  gap: 7px;
+  padding: 8px 10px;
+}
+
+.authState.authorized {
+  background: #e7f1e8;
+  border-color: #a9c9ae;
+  color: #38683e;
+}
+
+.actionGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.helperText {
+  color: #7d6c59;
+  font-size: 11px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.inspectionSummary {
+  background: #f7f1e8;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+}
+
+.inspectionSummary span,
+.planCard span {
+  color: #7d6c59;
+  font-size: 11px;
+}
+
+.planCard,
+.writeResult {
+  background: #eef5ef;
+  border: 1px solid #a9c9ae;
+  border-radius: 6px;
+  color: #38683e;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px;
+}
+
+.planCard.invalid,
+.writeResult.failed,
+.writeResult.unknown {
+  background: #fff0ee;
+  border-color: #dfaaa3;
+  color: #8a342a;
+}
+
+.writeResult.partial {
+  background: #fff5dc;
+  border-color: #e9ce86;
+  color: #75561b;
+}
+
+.planCard p {
+  margin: 4px 0;
+}
+
+.planCard ul {
+  margin: 7px 0 0;
+  padding-left: 20px;
+}
+
+.jobCard {
+  background: #fffaf2;
+  border: 1px solid #dbc9aa;
+  border-radius: 8px;
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+}
+
+.jobCard h2 {
+  color: #8b5424;
+  font-size: 14px;
+  margin: 0 0 2px;
+}
+
+.warningList,
+.errorList {
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 9px 10px;
+}
+
+.warningList {
+  background: #fff5dc;
+  border: 1px solid #e9ce86;
+  color: #75561b;
+}
+
+.errorList {
+  background: #fff0ee;
+  border: 1px solid #dfaaa3;
+  color: #8a342a;
+}
+
+.warningList ul,
+.errorList ul {
+  margin: 5px 0 0;
+  padding-left: 18px;
 }
 
 .primary {
@@ -225,4 +392,8 @@ textarea {
   gap: 8px;
   line-height: 1.4;
   padding: 10px 12px;
+}
+
+.status span {
+  white-space: pre-line;
 }

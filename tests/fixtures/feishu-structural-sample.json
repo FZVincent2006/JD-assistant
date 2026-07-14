@@ -1,0 +1,214 @@
+{
+  "revision_id": 7,
+  "items": [
+    {
+      "block_id": "page",
+      "block_type": 1,
+      "page": { "elements": [{ "text_run": { "content": "测试文档" } }], "style": {} },
+      "children": ["portfolio-heading", "portfolio-callout", "jd-heading", "jd-company-a", "jd-company-a-intro-heading", "jd-company-a-intro-callout", "jd-company-a-open-heading", "jd-company-a-job-1", "jd-company-a-quote-1", "jd-company-b", "jd-company-b-intro-heading", "jd-company-b-intro-callout", "jd-company-b-open-heading", "jd-company-b-job-1", "jd-company-b-quote-1"]
+    },
+    {
+      "block_id": "portfolio-heading",
+      "parent_id": "page",
+      "block_type": 3,
+      "heading1": { "elements": [{ "text_run": { "content": "Portfolio开放岗位汇总", "text_element_style": { "bold": true } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "portfolio-callout",
+      "parent_id": "page",
+      "block_type": 19,
+      "callout": { "background_color": 2, "border_color": 2, "emoji_id": "briefcase" },
+      "children": ["summary-company-a", "summary-job-a1", "summary-company-b", "summary-job-b1"]
+    },
+    {
+      "block_id": "summary-company-a",
+      "parent_id": "portfolio-callout",
+      "block_type": 5,
+      "heading3": { "elements": [{ "text_run": { "content": "示例公司甲", "text_element_style": { "bold": true } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "summary-job-a1",
+      "parent_id": "portfolio-callout",
+      "block_type": 12,
+      "bullet": { "elements": [{ "text_run": { "content": "示例岗位甲｜上海｜社招" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "summary-company-b",
+      "parent_id": "portfolio-callout",
+      "block_type": 5,
+      "heading3": { "elements": [{ "text_run": { "content": "示例公司乙", "text_element_style": { "bold": true } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "summary-job-b1",
+      "parent_id": "portfolio-callout",
+      "block_type": 12,
+      "bullet": { "elements": [{ "text_run": { "content": "示例岗位乙｜深圳｜社招" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-heading",
+      "parent_id": "page",
+      "block_type": 3,
+      "heading1": { "elements": [{ "text_run": { "content": "岗位JD整理", "text_element_style": { "bold": true } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a",
+      "parent_id": "page",
+      "block_type": 3,
+      "heading1": { "elements": [{ "text_run": { "content": "示例公司甲", "text_element_style": { "bold": true, "link": { "url": "https://example.com/a" } } } }], "style": { "align": 1, "sequence": "auto" } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a-intro-heading",
+      "parent_id": "page",
+      "block_type": 4,
+      "heading2": { "elements": [{ "text_run": { "content": "公司介绍", "text_element_style": { "text_color": 3 } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a-intro-callout",
+      "parent_id": "page",
+      "block_type": 19,
+      "callout": { "background_color": 2, "border_color": 2, "emoji_id": "gear" },
+      "children": ["jd-company-a-intro-bullet"]
+    },
+    {
+      "block_id": "jd-company-a-intro-bullet",
+      "parent_id": "jd-company-a-intro-callout",
+      "block_type": 12,
+      "bullet": { "elements": [{ "text_run": { "content": "示例公司甲介绍正文" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a-open-heading",
+      "parent_id": "page",
+      "block_type": 4,
+      "heading2": { "elements": [{ "text_run": { "content": "开放岗位", "text_element_style": { "text_color": 3 } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a-job-1",
+      "parent_id": "page",
+      "block_type": 5,
+      "heading3": { "elements": [{ "text_run": { "content": "（1）示例岗位甲｜上海｜社招", "text_element_style": { "bold": true } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a-quote-1",
+      "parent_id": "page",
+      "block_type": 34,
+      "quote_container": {},
+      "children": ["jd-company-a-work-label", "jd-company-a-work-bullet", "jd-company-a-require-label", "jd-company-a-require-bullet"]
+    },
+    {
+      "block_id": "jd-company-a-work-label",
+      "parent_id": "jd-company-a-quote-1",
+      "block_type": 2,
+      "text": { "elements": [{ "text_run": { "content": "工作内容：" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a-work-bullet",
+      "parent_id": "jd-company-a-quote-1",
+      "block_type": 12,
+      "bullet": { "elements": [{ "text_run": { "content": "示例工作内容" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a-require-label",
+      "parent_id": "jd-company-a-quote-1",
+      "block_type": 2,
+      "text": { "elements": [{ "text_run": { "content": "职位要求：" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-a-require-bullet",
+      "parent_id": "jd-company-a-quote-1",
+      "block_type": 12,
+      "bullet": { "elements": [{ "text_run": { "content": "示例职位要求" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b",
+      "parent_id": "page",
+      "block_type": 3,
+      "heading1": { "elements": [{ "text_run": { "content": "示例公司乙", "text_element_style": { "bold": true } } }], "style": { "align": 1, "sequence": "auto" } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b-intro-heading",
+      "parent_id": "page",
+      "block_type": 4,
+      "heading2": { "elements": [{ "text_run": { "content": "公司介绍", "text_element_style": { "text_color": 3 } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b-intro-callout",
+      "parent_id": "page",
+      "block_type": 19,
+      "callout": { "background_color": 2, "border_color": 2, "emoji_id": "gear" },
+      "children": ["jd-company-b-intro-bullet"]
+    },
+    {
+      "block_id": "jd-company-b-intro-bullet",
+      "parent_id": "jd-company-b-intro-callout",
+      "block_type": 12,
+      "bullet": { "elements": [{ "text_run": { "content": "示例公司乙介绍正文" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b-open-heading",
+      "parent_id": "page",
+      "block_type": 4,
+      "heading2": { "elements": [{ "text_run": { "content": "开放岗位", "text_element_style": { "text_color": 3 } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b-job-1",
+      "parent_id": "page",
+      "block_type": 5,
+      "heading3": { "elements": [{ "text_run": { "content": "（1）示例岗位乙｜深圳｜社招", "text_element_style": { "bold": true } } }], "style": { "align": 1 } },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b-quote-1",
+      "parent_id": "page",
+      "block_type": 34,
+      "quote_container": {},
+      "children": ["jd-company-b-work-label", "jd-company-b-work-bullet", "jd-company-b-require-label", "jd-company-b-require-bullet"]
+    },
+    {
+      "block_id": "jd-company-b-work-label",
+      "parent_id": "jd-company-b-quote-1",
+      "block_type": 2,
+      "text": { "elements": [{ "text_run": { "content": "工作内容：" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b-work-bullet",
+      "parent_id": "jd-company-b-quote-1",
+      "block_type": 12,
+      "bullet": { "elements": [{ "text_run": { "content": "示例工作内容乙" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b-require-label",
+      "parent_id": "jd-company-b-quote-1",
+      "block_type": 2,
+      "text": { "elements": [{ "text_run": { "content": "职位要求：" } }], "style": {} },
+      "children": []
+    },
+    {
+      "block_id": "jd-company-b-require-bullet",
+      "parent_id": "jd-company-b-quote-1",
+      "block_type": 12,
+      "bullet": { "elements": [{ "text_run": { "content": "示例职位要求乙" } }], "style": {} },
+      "children": []
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOST_NAME="cn.zhenfund.jd_assistant.feishu_auth"
+APP_ID="cli_aade4224b8789bef"
+KEYCHAIN_SERVICE="cn.zhenfund.jd-assistant.feishu"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SOURCE_APP="${FEISHU_HELPER_APP_PATH:-$ROOT_DIR/native-helper/.build/universal/Feishu JD Assistant Helper.app}"
+INSTALL_DIR="$HOME/Library/Application Support/ZhenFund JD Assistant"
+INSTALL_APP="$INSTALL_DIR/Feishu JD Assistant Helper.app"
+INSTALL_BINARY="$INSTALL_APP/Contents/MacOS/feishu-auth-host"
+LEGACY_BINARY="$INSTALL_DIR/feishu-auth-host"
+CHROME_MANIFEST="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/$HOST_NAME.json"
+EDGE_MANIFEST="$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts/$HOST_NAME.json"
+
+usage() {
+  printf '%s\n' "Usage: $0 [--dry-run] [--keep-existing-secret] chrome-extension://<32-letter-id>/ [...]" >&2
+  printf '%s\n' "       $0 --uninstall [--delete-secret]" >&2
+  exit 2
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  printf '%s' "$value"
+}
+
+render_origins() {
+  local first=1
+  local origin
+  printf '['
+  for origin in "${ORIGINS[@]}"; do
+    if [[ "$first" -eq 0 ]]; then printf ','; fi
+    printf '"%s"' "$(json_escape "$origin")"
+    first=0
+  done
+  printf ']'
+}
+
+render_manifest() {
+  local origins_json
+  origins_json="$(render_origins)"
+  printf '{"name":"%s","description":"ZhenFund JD Assistant Feishu authorization host","path":"%s","type":"stdio","allowed_origins":%s}' \
+    "$HOST_NAME" "$(json_escape "$INSTALL_BINARY")" "$origins_json"
+}
+
+MODE="install"
+DELETE_SECRET=0
+SECRET_POLICY="configure"
+if [[ "${1:-}" == "--dry-run" ]]; then
+  MODE="dry-run"
+  shift
+fi
+if [[ "${1:-}" == "--keep-existing-secret" ]]; then
+  SECRET_POLICY="keep-existing-or-configure"
+  shift
+fi
+if [[ "${1:-}" == "--uninstall" ]]; then
+  MODE="uninstall"
+  shift
+  if [[ "${1:-}" == "--delete-secret" ]]; then
+    DELETE_SECRET=1
+    shift
+  fi
+  [[ "$#" -eq 0 ]] || usage
+fi
+
+if [[ "$MODE" == "uninstall" ]]; then
+  if [[ "$DELETE_SECRET" -eq 1 ]]; then
+    if [[ -x "$INSTALL_BINARY" ]]; then
+      "$INSTALL_BINARY" --delete-secret --app-id "$APP_ID"
+    elif [[ -x "$SOURCE_APP/Contents/MacOS/feishu-auth-host" ]]; then
+      "$SOURCE_APP/Contents/MacOS/feishu-auth-host" --delete-secret --app-id "$APP_ID"
+    fi
+  fi
+  rm -f "$CHROME_MANIFEST" "$EDGE_MANIFEST" "$LEGACY_BINARY"
+  rm -rf "$INSTALL_APP"
+  exit 0
+fi
+
+[[ "$#" -gt 0 ]] || usage
+ORIGINS=()
+for candidate in "$@"; do
+  [[ "$candidate" =~ ^chrome-extension://[a-p]{32}/$ ]] || usage
+  duplicate=0
+  for existing in "${ORIGINS[@]:-}"; do
+    if [[ "$existing" == "$candidate" ]]; then duplicate=1; fi
+  done
+  if [[ "$duplicate" -eq 0 ]]; then ORIGINS+=("$candidate"); fi
+done
+
+MANIFEST_JSON="$(render_manifest)"
+if [[ "$MODE" == "dry-run" ]]; then
+  printf '{"manifests":[%s,%s],"secretPolicy":"%s"}\n' \
+    "$MANIFEST_JSON" "$MANIFEST_JSON" "$SECRET_POLICY"
+  exit 0
+fi
+
+[[ -x "$SOURCE_APP/Contents/MacOS/feishu-auth-host" ]] || {
+  printf '%s\n' "Native helper is not built. Run scripts/build-feishu-auth-helper.sh first." >&2
+  exit 1
+}
+
+mkdir -p "$INSTALL_DIR" "$(dirname "$CHROME_MANIFEST")" "$(dirname "$EDGE_MANIFEST")"
+rm -rf "$INSTALL_APP"
+ditto "$SOURCE_APP" "$INSTALL_APP"
+rm -f "$LEGACY_BINARY"
+printf '%s\n' "$MANIFEST_JSON" > "$CHROME_MANIFEST"
+printf '%s\n' "$MANIFEST_JSON" > "$EDGE_MANIFEST"
+chmod 0600 "$CHROME_MANIFEST" "$EDGE_MANIFEST"
+
+configure_secret=1
+if [[ "$SECRET_POLICY" == "keep-existing-or-configure" ]] \
+  && /usr/bin/security find-generic-password \
+    -s "$KEYCHAIN_SERVICE" -a "$APP_ID" >/dev/null 2>&1; then
+  configure_secret=0
+fi
+
+if [[ "$configure_secret" -eq 1 ]]; then
+  printf '%s\n' "Paste the Feishu App Secret, then press Return (input is hidden):" >&2
+  "$INSTALL_BINARY" --configure-secret --app-id "$APP_ID" < /dev/tty
+else
+  printf '%s\n' "Existing Feishu App Secret preserved in Keychain." >&2
+fi
+printf '%s\n' "Feishu authorization helper installed for Chrome and Edge." >&2
