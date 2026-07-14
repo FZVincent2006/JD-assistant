@@ -3,9 +3,10 @@ import { TEST_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
 import { buildFeishuOpenApiPlan, normalizeForMatch } from "../lib/feishuOpenApiPlan.js";
 import { verifyJdWrite, verifySummaryWrite } from "../lib/feishuWriteVerifier.js";
 
-export function createFeishuOpenApiWriter({ client, inspect, wait = defaultWait }) {
+export function createFeishuOpenApiWriter({ client, inspect, numberHeading, wait = defaultWait }) {
   if (typeof client?.request !== "function") throw new TypeError("A Feishu API client is required");
   if (typeof inspect !== "function") throw new TypeError("A Feishu inspect function is required");
+  if (typeof numberHeading !== "function") throw new TypeError("A Feishu page numberer is required");
   if (typeof wait !== "function") throw new TypeError("A wait function is required");
   let writing = false;
 
@@ -20,7 +21,7 @@ export function createFeishuOpenApiWriter({ client, inspect, wait = defaultWait 
     }
     writing = true;
     try {
-      return await executeWrite({ client, inspect, wait, draft });
+      return await executeWrite({ client, inspect, numberHeading, wait, draft });
     } finally {
       writing = false;
     }
@@ -29,7 +30,7 @@ export function createFeishuOpenApiWriter({ client, inspect, wait = defaultWait 
   return { write };
 }
 
-async function executeWrite({ client, inspect, wait, draft }) {
+async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
   let initial;
   try {
     initial = await inspect();
@@ -134,65 +135,30 @@ async function executeWrite({ client, inspect, wait, draft }) {
   let numberingAttempted = false;
   if (plan.mode === "new-company" && !hasAutomaticHeadingNumbering(afterJd, plan.companyName)) {
     numberingAttempted = true;
-    const company = findJdCompany(afterJd, plan.companyName);
-    if (!company?.headingBlockId) {
+    try {
+      await numberHeading(plan.companyName);
+    } catch (error) {
+      return failedForError({
+        draft,
+        plan,
+        completedStages,
+        stage: "jd-numbering-page",
+        error,
+        status: "partial",
+        repairHint: error?.message || "岗位 JD 内容已写入，但飞书页面自动编号失败；已停止 Portfolio 写入。"
+      });
+    }
+
+    afterJd = await waitForNumberedJd({ inspect, wait, plan, attempts: 5 });
+    if (!afterJd) {
       return makeResult({
         draft,
         plan,
         completedStages,
         status: "partial",
-        failedStage: "jd-numbering",
-        repairHint: "岗位 JD 内容已写入，但无法确定新公司 Heading 1 的块 ID，已停止自动编号和 Portfolio 写入。"
+        failedStage: "jd-numbering-verify",
+        repairHint: "飞书页面已执行编号操作，但 OpenAPI 未在限定时间内确认自动编号；已停止 Portfolio 写入。"
       });
-    }
-
-    let numberingApiSucceeded = false;
-    try {
-      await enableAutomaticHeadingNumbering(
-        client,
-        initial.documentId,
-        company.headingBlockId,
-        afterJd.revisionId
-      );
-      numberingApiSucceeded = true;
-      await wait(400);
-      afterJd = await inspect();
-    } catch (error) {
-      if (numberingApiSucceeded) {
-        return makeResult({
-          draft,
-          plan,
-          completedStages,
-          status: "unknown",
-          failedStage: "jd-numbering-verify",
-          repairHint: "岗位 JD 内容及自动编号请求已被 API 接受，但无法回读；不要重复提交，请先人工检查测试副本。"
-        });
-      }
-      if (!isAmbiguousNetworkError(error)) {
-        return failedForError({
-          draft,
-          plan,
-          completedStages,
-          stage: "jd-numbering",
-          error,
-          status: "partial",
-          repairHint: "岗位 JD 内容已写入，但公司 Heading 1 自动编号失败；已停止 Portfolio 写入。"
-        });
-      }
-      await wait(400);
-      try {
-        afterJd = await inspect();
-      } catch {
-        return failedForError({
-          draft,
-          plan,
-          completedStages,
-          stage: "jd-numbering",
-          error,
-          status: "unknown",
-          repairHint: "公司 Heading 1 自动编号请求状态未知且无法回读；不要重复提交，请先人工检查测试副本。"
-        });
-      }
     }
   }
 
@@ -299,21 +265,18 @@ async function createDescendants(client, documentId, target, revisionId, request
   );
 }
 
-async function enableAutomaticHeadingNumbering(client, documentId, headingBlockId, revisionId) {
-  return client.request(
-    `/open-apis/docx/v1/documents/${encodeURIComponent(documentId)}/blocks/${encodeURIComponent(headingBlockId)}`,
-    {
-      method: "PATCH",
-      query: { document_revision_id: revisionId },
-      body: {
-        update_text_style: {
-          style: { sequence: "auto" },
-          fields: [8]
-        }
-      },
-      stage: "jd-numbering"
+async function waitForNumberedJd({ inspect, wait, plan, attempts }) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) await wait(400);
+    let snapshot;
+    try {
+      snapshot = await inspect();
+    } catch {
+      return null;
     }
-  );
+    if (verifyJdWrite(snapshot, plan).ok) return snapshot;
+  }
+  return null;
 }
 
 function findJdCompany(snapshot, companyName) {

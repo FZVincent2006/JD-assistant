@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { FeishuApiError } from "../src/background/feishuApiClient.js";
 import { createFeishuOpenApiWriter } from "../src/background/feishuOpenApiWriter.js";
 import { TEST_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
-import { draft, successfulSnapshots } from "./helpers/feishuWriteScenario.js";
+import { buildFeishuOpenApiPlan } from "../src/lib/feishuOpenApiPlan.js";
+import { draft, initialSnapshot, successfulSnapshots } from "./helpers/feishuWriteScenario.js";
 
-function writerSetup({ snapshots, request } = {}) {
+function writerSetup({ snapshots, request, numberHeading = vi.fn().mockResolvedValue({ ok: true }) } = {}) {
   const values = snapshots ?? successfulSnapshots();
   values.initial.documentId = "doc-test";
   values.unnumberedJd.documentId = "doc-test";
@@ -21,14 +22,15 @@ function writerSetup({ snapshots, request } = {}) {
     values,
     inspect,
     client,
+    numberHeading,
     wait,
-    writer: createFeishuOpenApiWriter({ client, inspect, wait })
+    writer: createFeishuOpenApiWriter({ client, inspect, numberHeading, wait })
   };
 }
 
 describe("Feishu phased OpenAPI writer", () => {
-  it("writes JD, enables automatic heading numbering, verifies it, then writes the summary", async () => {
-    const { writer, client, inspect, wait, values } = writerSetup();
+  it("writes JD, numbers its heading on the page, verifies it, then writes the summary", async () => {
+    const { writer, client, inspect, numberHeading, wait, values } = writerSetup();
 
     const result = await writer.write(draft);
 
@@ -42,49 +44,37 @@ describe("Feishu phased OpenAPI writer", () => {
       companyName: draft.companyName,
       jobTitles: draft.jobs.map((job) => job.title)
     });
-    expect(client.request).toHaveBeenCalledTimes(3);
+    expect(client.request).toHaveBeenCalledTimes(2);
     expect(client.request.mock.calls[0][1]).toMatchObject({
       method: "POST",
       query: { document_revision_id: values.initial.revisionId },
       body: { index: values.plan.jdTarget.index },
       stage: "jd-write"
     });
-    expect(client.request.mock.calls[1]).toEqual([
-      "/open-apis/docx/v1/documents/doc-test/blocks/new-company-heading",
-      {
-        method: "PATCH",
-        query: { document_revision_id: values.unnumberedJd.revisionId },
-        body: {
-          update_text_style: {
-            style: { sequence: "auto" },
-            fields: [8]
-          }
-        },
-        stage: "jd-numbering"
-      }
-    ]);
-    expect(client.request.mock.calls[2][1]).toMatchObject({
+    expect(numberHeading).toHaveBeenCalledOnce();
+    expect(numberHeading).toHaveBeenCalledWith(draft.companyName);
+    expect(client.request.mock.calls[1][1]).toMatchObject({
       query: { document_revision_id: values.jd.revisionId },
       body: { index: values.plan.summaryTarget.index },
       stage: "summary-write"
     });
+    expect(client.request.mock.calls.flat().join(" ")).not.toContain("update_text_style");
     expect(inspect).toHaveBeenCalledTimes(4);
     expect(wait).toHaveBeenNthCalledWith(1, 400);
     expect(wait).toHaveBeenNthCalledWith(2, 400);
-    expect(wait).toHaveBeenNthCalledWith(3, 400);
   });
 
-  it("stops after JD creation when Feishu rejects automatic numbering", async () => {
-    const request = vi.fn()
-      .mockResolvedValueOnce({})
-      .mockRejectedValueOnce(new FeishuApiError({
-        status: 400,
-        code: 1770001,
-        logId: "log-numbering",
-        stage: "jd-numbering",
-        message: "rejected"
-      }));
-    const { writer, inspect } = writerSetup({ request });
+  it("stops after JD creation when page-assisted numbering fails", async () => {
+    const pageError = Object.assign(new Error("当前活动标签页不是指定飞书测试副本。"), {
+      stage: "jd-numbering-page",
+      reason: "wrong-document",
+      status: 0,
+      code: 0,
+      logId: ""
+    });
+    const { writer, client } = writerSetup({
+      numberHeading: vi.fn().mockRejectedValue(pageError)
+    });
 
     const result = await writer.write(draft);
 
@@ -92,18 +82,13 @@ describe("Feishu phased OpenAPI writer", () => {
       ok: false,
       status: "partial",
       completedStages: [],
-      failedStage: "jd-numbering",
-      errorCode: 1770001,
-      logId: "log-numbering"
+      failedStage: "jd-numbering-page"
     });
-    expect(result.repairHint).toContain("自动编号");
-    expect(request).toHaveBeenCalledTimes(2);
-    expect(inspect).toHaveBeenCalledTimes(2);
+    expect(client.request).toHaveBeenCalledTimes(1);
   });
 
   it("reports JD-only partial success when summary creation fails", async () => {
     const request = vi.fn()
-      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce(new FeishuApiError({ status: 403, code: 99991672, logId: "log-summary", stage: "summary-write", message: "rejected" }));
     const { writer } = writerSetup({ request });
@@ -121,11 +106,22 @@ describe("Feishu phased OpenAPI writer", () => {
     expect(result.repairHint).toContain("Portfolio");
   });
 
-  it("stops before Portfolio when the numbering PATCH is accepted but remains absent on read-back", async () => {
+  it("polls read-only at most five times after one shortcut and stops before Portfolio", async () => {
     const values = successfulSnapshots();
-    values.jd = structuredClone(values.unnumberedJd);
-    values.jd.revisionId += 1;
-    const { writer, client, inspect } = writerSetup({ snapshots: values });
+    values.initial.documentId = "doc-test";
+    values.unnumberedJd.documentId = "doc-test";
+    const stale = Array.from({ length: 5 }, (_, index) => ({
+      ...structuredClone(values.unnumberedJd),
+      revisionId: values.unnumberedJd.revisionId + index
+    }));
+    const inspect = vi.fn()
+      .mockResolvedValueOnce(values.initial)
+      .mockResolvedValueOnce(values.unnumberedJd);
+    for (const snapshot of stale) inspect.mockResolvedValueOnce(snapshot);
+    const request = vi.fn().mockResolvedValue({});
+    const numberHeading = vi.fn().mockResolvedValue({ ok: true });
+    const wait = vi.fn().mockResolvedValue(undefined);
+    const writer = createFeishuOpenApiWriter({ client: { request }, inspect, numberHeading, wait });
 
     const result = await writer.write(draft);
 
@@ -135,9 +131,52 @@ describe("Feishu phased OpenAPI writer", () => {
       completedStages: [],
       failedStage: "jd-numbering-verify"
     });
-    expect(result.repairHint).toContain("自动编号");
-    expect(client.request).toHaveBeenCalledTimes(2);
-    expect(inspect).toHaveBeenCalledTimes(3);
+    expect(numberHeading).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(inspect).toHaveBeenCalledTimes(7);
+  });
+
+  it("never invokes page numbering when appending jobs", async () => {
+    const current = initialSnapshot();
+    current.documentId = "doc-test";
+    const companyName = current.jd.companies[0].name;
+    current.portfolio.companies[0].name = companyName;
+    const appendDraft = { ...draft, companyName, jobs: [{ ...draft.jobs[0], title: "新增岗位" }] };
+    const plan = buildFeishuOpenApiPlan(current, appendDraft);
+    const afterJd = structuredClone(current);
+    afterJd.revisionId += 1;
+    afterJd.jd.companies[0].jobs.push({
+      title: "新增岗位",
+      ordinal: plan.jobs[0].ordinal,
+      text: `（${plan.jobs[0].ordinal}）新增岗位｜上海｜社招`,
+      blockId: "append-job",
+      blockType: 5,
+      quoteBlockId: "append-quote",
+      index: plan.jdTarget.index
+    });
+    const complete = structuredClone(afterJd);
+    complete.revisionId += 1;
+    complete.portfolio.companies[0].jobs.push({
+      title: "新增岗位",
+      text: "新增岗位｜上海｜社招",
+      blockId: "append-summary",
+      blockType: 12,
+      index: plan.summaryTarget.index
+    });
+    const inspect = vi.fn()
+      .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(afterJd)
+      .mockResolvedValueOnce(complete);
+    const numberHeading = vi.fn();
+    const writer = createFeishuOpenApiWriter({
+      client: { request: vi.fn().mockResolvedValue({}) },
+      inspect,
+      numberHeading,
+      wait: vi.fn().mockResolvedValue(undefined)
+    });
+
+    await expect(writer.write(appendDraft)).resolves.toMatchObject({ ok: true, mode: "append-jobs" });
+    expect(numberHeading).not.toHaveBeenCalled();
   });
 
   it("stops before summary when JD semantic verification fails", async () => {
@@ -177,7 +216,7 @@ describe("Feishu phased OpenAPI writer", () => {
     const result = await writer.write(draft);
 
     expect(result.ok).toBe(true);
-    expect(request).toHaveBeenCalledTimes(3);
+    expect(request).toHaveBeenCalledTimes(2);
     expect(inspect).toHaveBeenCalledTimes(4);
   });
 
@@ -200,7 +239,12 @@ describe("Feishu phased OpenAPI writer", () => {
     initial.documentId = "doc-test";
     const inspect = vi.fn().mockResolvedValueOnce(initial).mockRejectedValueOnce(new Error("unreadable"));
     const request = vi.fn().mockRejectedValue(new FeishuApiError({ status: 0, stage: "jd-write", message: "network" }));
-    const writer = createFeishuOpenApiWriter({ client: { request }, inspect, wait: vi.fn() });
+    const writer = createFeishuOpenApiWriter({
+      client: { request },
+      inspect,
+      numberHeading: vi.fn().mockResolvedValue({ ok: true }),
+      wait: vi.fn()
+    });
 
     const result = await writer.write(draft);
 
@@ -215,7 +259,12 @@ describe("Feishu phased OpenAPI writer", () => {
     initial.documentId = "doc-test";
     const inspect = vi.fn().mockResolvedValueOnce(initial).mockRejectedValueOnce(new Error("unreadable"));
     const request = vi.fn().mockResolvedValue({});
-    const writer = createFeishuOpenApiWriter({ client: { request }, inspect, wait: vi.fn() });
+    const writer = createFeishuOpenApiWriter({
+      client: { request },
+      inspect,
+      numberHeading: vi.fn().mockResolvedValue({ ok: true }),
+      wait: vi.fn()
+    });
 
     const result = await writer.write(draft);
 
