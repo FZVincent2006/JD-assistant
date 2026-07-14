@@ -4,7 +4,7 @@ import { inspectRecruitingDocument } from "../lib/feishuTemplateReader.js";
 import { createFeishuApiClient } from "./feishuApiClient.js";
 import { createFeishuAuth } from "./feishuAuth.js";
 import { createFeishuOpenApiWriter } from "./feishuOpenApiWriter.js";
-import { resolveFixedTestDocument } from "./feishuWikiResolver.js";
+import { resolveFixedProductionDocument } from "./feishuWikiResolver.js";
 
 const FEISHU_MESSAGE_TYPES = new Set([
   "FEISHU_AUTH_STATUS",
@@ -19,7 +19,7 @@ export function createFeishuBackgroundServices({ chromeApi = chrome, fetchImpl =
   const auth = createFeishuAuth({ chromeApi, fetchImpl });
   const client = createFeishuApiClient({ fetchImpl, getAccessToken: auth.getAccessToken });
   const inspect = async () => {
-    const document = await resolveFixedTestDocument(client);
+    const document = await resolveFixedProductionDocument(client);
     let model;
     try {
       model = buildBlockModel(document.blocks, document.revisionId);

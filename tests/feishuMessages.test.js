@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { handleFeishuMessage } from "../src/content/feishuMessages.js";
-import { TEST_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
+import { PRODUCTION_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
 
 describe("handleFeishuMessage", () => {
   it("returns a full document snapshot for inspection", async () => {
@@ -8,7 +8,7 @@ describe("handleFeishuMessage", () => {
     const scan = vi.fn().mockResolvedValue(snapshot);
     await expect(handleFeishuMessage(
       { type: "FEISHU_INSPECT" },
-      { root: {}, url: TEST_FEISHU_DOC_URL, scan }
+      { root: {}, url: PRODUCTION_FEISHU_DOC_URL, scan }
     )).resolves.toEqual({ ok: true, snapshot });
   });
 
@@ -17,9 +17,9 @@ describe("handleFeishuMessage", () => {
     const draft = { companyName: "Test" };
     const result = await handleFeishuMessage(
       { type: "FEISHU_WRITE", payload: draft },
-      { root: {}, url: TEST_FEISHU_DOC_URL, write }
+      { root: {}, url: PRODUCTION_FEISHU_DOC_URL, write }
     );
-    expect(write).toHaveBeenCalledWith({ root: {}, url: TEST_FEISHU_DOC_URL, draft }, expect.any(Object));
+    expect(write).toHaveBeenCalledWith({ root: {}, url: PRODUCTION_FEISHU_DOC_URL, draft }, expect.any(Object));
     expect(result.ok).toBe(true);
   });
 });

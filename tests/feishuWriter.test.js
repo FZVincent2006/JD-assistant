@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { executeFeishuWrite, pasteFeishuFragment } from "../src/content/feishuWriter.js";
-import { TEST_FEISHU_DOC_URL } from "../src/content/feishuDocument.js";
+import { PRODUCTION_FEISHU_DOC_URL } from "../src/content/feishuDocument.js";
 
 const draft = {
   companyName: "Codex 测试公司",
@@ -38,7 +38,7 @@ describe("executeFeishuWrite", () => {
   it("writes and verifies JD before writing and verifying the summary", async () => {
     const events = [];
     const result = await executeFeishuWrite(
-      { url: TEST_FEISHU_DOC_URL, draft, root: document },
+      { url: PRODUCTION_FEISHU_DOC_URL, draft, root: document },
       {
         inspect: vi.fn()
           .mockResolvedValueOnce(emptySnapshot)
@@ -56,7 +56,7 @@ describe("executeFeishuWrite", () => {
   it("keeps a verified JD write and reports a summary verification failure without retrying", async () => {
     const paste = vi.fn().mockResolvedValue(true);
     const result = await executeFeishuWrite(
-      { url: TEST_FEISHU_DOC_URL, draft, root: document },
+      { url: PRODUCTION_FEISHU_DOC_URL, draft, root: document },
       {
         inspect: vi.fn()
           .mockResolvedValueOnce(emptySnapshot)
@@ -81,7 +81,7 @@ describe("executeFeishuWrite", () => {
       .mockResolvedValueOnce(true)
       .mockRejectedValueOnce(new Error("浏览器拒绝执行粘贴"));
     const result = await executeFeishuWrite(
-      { url: TEST_FEISHU_DOC_URL, draft, root: document },
+      { url: PRODUCTION_FEISHU_DOC_URL, draft, root: document },
       {
         inspect: vi.fn()
           .mockResolvedValueOnce(emptySnapshot)
@@ -100,14 +100,14 @@ describe("executeFeishuWrite", () => {
     expect(paste).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects every document except the configured test copy", async () => {
+  it("rejects every document except the configured production document", async () => {
     const inspect = vi.fn();
     const result = await executeFeishuWrite(
-      { url: "https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d", draft, root: document },
+      { url: "https://zhenfund.feishu.cn/wiki/LlhrwSLIvilANZk1opwcQGlUnNv", draft, root: document },
       { inspect }
     );
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("仅允许写入指定测试副本");
+    expect(result.error).toContain("仅允许写入指定正式招聘文档");
     expect(inspect).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { prepareFeishuHeadingNumbering } from "../src/content/feishuHeadingNumbering.js";
-import { TEST_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
+import { PRODUCTION_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
 
 function heading(name, id = "company", numbered = false) {
   return `<div class="block docx-heading1-block" data-block-id="${id}">
@@ -33,7 +33,7 @@ describe("prepareFeishuHeadingNumbering", () => {
 
     await expect(prepareFeishuHeadingNumbering({
       root: document,
-      url: TEST_FEISHU_DOC_URL,
+      url: PRODUCTION_FEISHU_DOC_URL,
       companyName: "CoFANCY 可糖",
       settle: vi.fn().mockResolvedValue(undefined)
     })).resolves.toEqual({ ok: true, state: "prepared" });
@@ -45,8 +45,8 @@ describe("prepareFeishuHeadingNumbering", () => {
 
   it.each([
     ["https://zhenfund.feishu.cn/wiki/production", heading("CoFANCY 可糖"), "wrong-document"],
-    [TEST_FEISHU_DOC_URL, "", "heading-missing"],
-    [TEST_FEISHU_DOC_URL, heading("CoFANCY 可糖", "a") + heading("CoFANCY 可糖", "b"), "heading-duplicate"]
+    [PRODUCTION_FEISHU_DOC_URL, "", "heading-missing"],
+    [PRODUCTION_FEISHU_DOC_URL, heading("CoFANCY 可糖", "a") + heading("CoFANCY 可糖", "b"), "heading-duplicate"]
   ])("rejects unsafe page state %#", async (url, html, reason) => {
     mount(html);
     const result = await prepareFeishuHeadingNumbering({
@@ -63,7 +63,7 @@ describe("prepareFeishuHeadingNumbering", () => {
     mount(heading("CoFANCY 可糖", "company", true));
     const result = await prepareFeishuHeadingNumbering({
       root: document,
-      url: TEST_FEISHU_DOC_URL,
+      url: PRODUCTION_FEISHU_DOC_URL,
       companyName: "CoFANCY 可糖",
       settle: vi.fn().mockResolvedValue(undefined)
     });

@@ -1,4 +1,4 @@
-import { isTestFeishuDocument } from "../lib/feishuConfig.js";
+import { isProductionFeishuDocument } from "../lib/feishuConfig.js";
 
 export class FeishuPageNumberingError extends Error {
   constructor(message, reason = "page-unavailable") {
@@ -12,7 +12,7 @@ export function createFeishuPageNumbering({ chromeApi = chrome } = {}) {
   return {
     async prepare(companyName) {
       const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id || !isTestFeishuDocument(tab.url)) {
+      if (!tab?.id || !isProductionFeishuDocument(tab.url)) {
         throw new FeishuPageNumberingError("当前活动标签页不是指定飞书测试副本。", "wrong-document");
       }
       const message = {

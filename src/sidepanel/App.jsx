@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Bug, CheckCircle2, ClipboardPaste, ExternalLink, KeyRound, Send, Wand2 } from "lucide-react";
-import { TEST_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
+import { PRODUCTION_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
 import { parseCompanyJdBatch, validateCompanyDraft } from "../lib/companyJdParser.js";
 import { parseJd } from "../lib/jdParser.js";
 import {
@@ -379,9 +379,9 @@ function FeishuAccessPanel({ authStatus, inspection, writing, onAuthorize, onIns
       <div className="documentTarget">
         <div>
           <strong>测试副本文档</strong>
-          <span>{TEST_FEISHU_DOC_URL}</span>
+          <span>{PRODUCTION_FEISHU_DOC_URL}</span>
         </div>
-        <a className="secondary" href={TEST_FEISHU_DOC_URL} target="_blank" rel="noreferrer">
+        <a className="secondary" href={PRODUCTION_FEISHU_DOC_URL} target="_blank" rel="noreferrer">
           <ExternalLink size={15} />
           打开文档检查
         </a>

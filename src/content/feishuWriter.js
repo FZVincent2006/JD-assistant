@@ -4,7 +4,7 @@ import { findFeishuInsertionTarget, inspectFeishuDocument, isAllowedFeishuDocume
 
 export async function executeFeishuWrite({ url, draft, root = document }, dependencies = {}) {
   if (!isAllowedFeishuDocument(url)) {
-    return { ok: false, stage: "preflight", completed: [], error: "仅允许写入指定测试副本，正式文档保持只读。" };
+    return { ok: false, stage: "preflight", completed: [], error: "仅允许写入指定正式招聘文档。" };
   }
 
   const inspect = dependencies.inspect ?? ((targetRoot) => inspectFeishuDocument(targetRoot));

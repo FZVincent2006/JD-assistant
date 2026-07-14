@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { FeishuApiError } from "../src/background/feishuApiClient.js";
 import { createFeishuOpenApiWriter } from "../src/background/feishuOpenApiWriter.js";
-import { TEST_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
+import { PRODUCTION_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
 import { buildFeishuOpenApiPlan } from "../src/lib/feishuOpenApiPlan.js";
 import { draft, initialSnapshot, successfulSnapshots } from "./helpers/feishuWriteScenario.js";
 
@@ -37,7 +37,7 @@ describe("Feishu phased OpenAPI writer", () => {
       mode: "new-company",
       completedStages: ["jd", "summary"],
       failedStage: null,
-      documentUrl: TEST_FEISHU_DOC_URL,
+      documentUrl: PRODUCTION_FEISHU_DOC_URL,
       companyName: draft.companyName,
       jobTitles: draft.jobs.map((job) => job.title)
     });

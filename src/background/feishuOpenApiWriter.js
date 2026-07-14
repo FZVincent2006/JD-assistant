@@ -1,5 +1,5 @@
 import { renderJdDescendants, renderSummaryDescendants } from "../lib/feishuBlockRenderer.js";
-import { TEST_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
+import { PRODUCTION_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
 import { buildFeishuOpenApiPlan } from "../lib/feishuOpenApiPlan.js";
 import { verifyJdWrite, verifySummaryWrite } from "../lib/feishuWriteVerifier.js";
 
@@ -264,7 +264,7 @@ function makeResult({
     mode: plan?.mode ?? null,
     completedStages: [...completedStages],
     failedStage,
-    documentUrl: TEST_FEISHU_DOC_URL,
+    documentUrl: PRODUCTION_FEISHU_DOC_URL,
     companyName: plan?.companyName ?? String(draft.companyName ?? "").trim(),
     jobTitles: plan?.jobs?.map((job) => job.title) ?? (draft.jobs ?? []).map((job) => job.title),
     errorCode: Number.isFinite(error?.code) ? error.code : 0,

@@ -1,12 +1,12 @@
-import { isTestFeishuDocument } from "../lib/feishuConfig.js";
+import { isProductionFeishuDocument } from "../lib/feishuConfig.js";
 import { executeFeishuWrite } from "./feishuWriter.js";
 import { findFeishuInsertionTargetFully, scanFeishuDocument } from "./feishuScanner.js";
 
 export async function handleFeishuMessage(message, options = {}) {
   const root = options.root ?? document;
   const url = options.url ?? location.href;
-  if (!isTestFeishuDocument(url)) {
-    return { ok: false, error: "仅允许操作指定飞书测试副本，正式文档保持只读。" };
+  if (!isProductionFeishuDocument(url)) {
+    return { ok: false, error: "仅允许操作指定正式招聘文档。" };
   }
 
   if (message?.type === "FEISHU_INSPECT") {

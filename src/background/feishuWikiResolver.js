@@ -1,8 +1,8 @@
-import { TEST_FEISHU_WIKI_TOKEN } from "../lib/feishuConfig.js";
+import { PRODUCTION_FEISHU_WIKI_TOKEN } from "../lib/feishuConfig.js";
 
-export async function resolveFixedTestDocument(client) {
+export async function resolveFixedProductionDocument(client) {
   const wiki = await client.request("/open-apis/wiki/v2/spaces/get_node", {
-    query: { token: TEST_FEISHU_WIKI_TOKEN },
+    query: { token: PRODUCTION_FEISHU_WIKI_TOKEN },
     stage: "wiki-resolve"
   });
   const node = wiki?.node;
@@ -30,7 +30,7 @@ export async function resolveFixedTestDocument(client) {
   const revisionId = document.revision_id;
   const blocks = await client.listAllBlocks(documentId, revisionId);
   return {
-    wikiToken: TEST_FEISHU_WIKI_TOKEN,
+    wikiToken: PRODUCTION_FEISHU_WIKI_TOKEN,
     documentId,
     spaceId: node.space_id,
     title: document.title || node.title,

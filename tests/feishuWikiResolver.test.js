@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { TEST_FEISHU_WIKI_TOKEN } from "../src/lib/feishuConfig.js";
-import { resolveFixedTestDocument } from "../src/background/feishuWikiResolver.js";
+import { PRODUCTION_FEISHU_WIKI_TOKEN } from "../src/lib/feishuConfig.js";
+import { resolveFixedProductionDocument } from "../src/background/feishuWikiResolver.js";
 
 describe("fixed Feishu Wiki resolver", () => {
   it("resolves only the fixed Wiki token to document metadata and blocks", async () => {
@@ -8,7 +8,7 @@ describe("fixed Feishu Wiki resolver", () => {
     const client = {
       request: vi.fn(async (path, options) => {
         if (path === "/open-apis/wiki/v2/spaces/get_node") {
-          expect(options).toMatchObject({ query: { token: TEST_FEISHU_WIKI_TOKEN }, stage: "wiki-resolve" });
+          expect(options).toMatchObject({ query: { token: PRODUCTION_FEISHU_WIKI_TOKEN }, stage: "wiki-resolve" });
           return {
             node: {
               space_id: "space-1",
@@ -27,8 +27,8 @@ describe("fixed Feishu Wiki resolver", () => {
       })
     };
 
-    await expect(resolveFixedTestDocument(client)).resolves.toEqual({
-      wikiToken: TEST_FEISHU_WIKI_TOKEN,
+    await expect(resolveFixedProductionDocument(client)).resolves.toEqual({
+      wikiToken: PRODUCTION_FEISHU_WIKI_TOKEN,
       documentId: "doc-1",
       spaceId: "space-1",
       title: "测试文档",
@@ -45,7 +45,7 @@ describe("fixed Feishu Wiki resolver", () => {
       listAllBlocks: vi.fn()
     };
 
-    await expect(resolveFixedTestDocument(client)).rejects.toThrow("not a docx document");
+    await expect(resolveFixedProductionDocument(client)).rejects.toThrow("not a docx document");
     expect(client.listAllBlocks).not.toHaveBeenCalled();
   });
 
@@ -57,6 +57,6 @@ describe("fixed Feishu Wiki resolver", () => {
       listAllBlocks: vi.fn()
     };
 
-    await expect(resolveFixedTestDocument(client)).rejects.toThrow("metadata is incomplete");
+    await expect(resolveFixedProductionDocument(client)).rejects.toThrow("metadata is incomplete");
   });
 });

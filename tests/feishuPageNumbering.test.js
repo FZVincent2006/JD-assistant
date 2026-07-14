@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { createFeishuPageNumbering } from "../src/background/feishuPageNumbering.js";
-import { TEST_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
+import { PRODUCTION_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
 
 describe("Feishu page numbering transport", () => {
   it("sends one preparation message only to the active test-copy tab", async () => {
     const sendMessage = vi.fn().mockResolvedValue({ ok: true, state: "prepared" });
     const chromeApi = { tabs: {
-      query: vi.fn().mockResolvedValue([{ id: 42, url: `${TEST_FEISHU_DOC_URL}?fromScene=spaceOverview` }]),
+      query: vi.fn().mockResolvedValue([{ id: 42, url: `${PRODUCTION_FEISHU_DOC_URL}?fromScene=spaceOverview` }]),
       sendMessage
     }};
     const service = createFeishuPageNumbering({ chromeApi });
@@ -43,7 +43,7 @@ describe("Feishu page numbering transport", () => {
     const executeScript = vi.fn().mockResolvedValue([{ result: undefined }]);
     const chromeApi = {
       tabs: {
-        query: vi.fn().mockResolvedValue([{ id: 42, url: TEST_FEISHU_DOC_URL }]),
+        query: vi.fn().mockResolvedValue([{ id: 42, url: PRODUCTION_FEISHU_DOC_URL }]),
         sendMessage
       },
       scripting: { executeScript }
@@ -71,7 +71,7 @@ describe("Feishu page numbering transport", () => {
     const executeScript = vi.fn().mockRejectedValue(new Error("Cannot access contents of the page"));
     const service = createFeishuPageNumbering({ chromeApi: {
       tabs: {
-        query: vi.fn().mockResolvedValue([{ id: 42, url: TEST_FEISHU_DOC_URL }]),
+        query: vi.fn().mockResolvedValue([{ id: 42, url: PRODUCTION_FEISHU_DOC_URL }]),
         sendMessage
       },
       scripting: { executeScript }
@@ -90,7 +90,7 @@ describe("Feishu page numbering transport", () => {
     const executeScript = vi.fn().mockResolvedValue([{ result: undefined }]);
     const service = createFeishuPageNumbering({ chromeApi: {
       tabs: {
-        query: vi.fn().mockResolvedValue([{ id: 42, url: TEST_FEISHU_DOC_URL }]),
+        query: vi.fn().mockResolvedValue([{ id: 42, url: PRODUCTION_FEISHU_DOC_URL }]),
         sendMessage
       },
       scripting: { executeScript }
@@ -106,7 +106,7 @@ describe("Feishu page numbering transport", () => {
 
   it("normalizes page failures without leaking DOM details", async () => {
     const service = createFeishuPageNumbering({ chromeApi: { tabs: {
-      query: vi.fn().mockResolvedValue([{ id: 42, url: TEST_FEISHU_DOC_URL }]),
+      query: vi.fn().mockResolvedValue([{ id: 42, url: PRODUCTION_FEISHU_DOC_URL }]),
       sendMessage: vi.fn().mockResolvedValue({ ok: false, reason: "heading-duplicate", error: "safe" })
     }}});
     await expect(service.prepare("CoFANCY 可糖")).rejects.toMatchObject({

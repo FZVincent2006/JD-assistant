@@ -1,9 +1,12 @@
-import { isTestFeishuDocument, TEST_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
+import {
+  isProductionFeishuDocument,
+  PRODUCTION_FEISHU_DOC_URL
+} from "../lib/feishuConfig.js";
 
-export { TEST_FEISHU_DOC_URL };
+export { PRODUCTION_FEISHU_DOC_URL };
 
 export function isAllowedFeishuDocument(url = "") {
-  return isTestFeishuDocument(url);
+  return isProductionFeishuDocument(url);
 }
 
 export function inspectFeishuDocument(root = document) {

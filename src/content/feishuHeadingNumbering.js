@@ -1,4 +1,4 @@
-import { isTestFeishuDocument } from "../lib/feishuConfig.js";
+import { isProductionFeishuDocument } from "../lib/feishuConfig.js";
 
 const REASONS = {
   "wrong-document": "当前活动标签页不是指定飞书测试副本。",
@@ -15,7 +15,7 @@ export async function prepareFeishuHeadingNumbering({
   settle = defaultSettle,
   maxSteps = 160
 }) {
-  if (!isTestFeishuDocument(url)) return failure("wrong-document");
+  if (!isProductionFeishuDocument(url)) return failure("wrong-document");
   if (!root.querySelector('[contenteditable="true"]') && root.querySelector(".block.docx-heading1-block[data-block-id]")) {
     return failure("not-editable");
   }

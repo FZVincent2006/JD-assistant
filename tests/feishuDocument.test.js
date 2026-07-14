@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import {
-  TEST_FEISHU_DOC_URL,
+  PRODUCTION_FEISHU_DOC_URL,
   findFeishuInsertionTarget,
   inspectFeishuDocument,
   isAllowedFeishuDocument
@@ -33,10 +33,10 @@ function makeDocument() {
 }
 
 describe("isAllowedFeishuDocument", () => {
-  it("only allows the configured test copy regardless of query or hash", () => {
-    expect(TEST_FEISHU_DOC_URL).toContain("LlhrwSLIvilANZk1opwcQGlUnNv");
-    expect(isAllowedFeishuDocument(`${TEST_FEISHU_DOC_URL}?fromScene=spaceOverview#block`)).toBe(true);
-    expect(isAllowedFeishuDocument("https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d")).toBe(false);
+  it("only allows the configured production document regardless of query or hash", () => {
+    expect(PRODUCTION_FEISHU_DOC_URL).toContain("RTWjwVZjri4uCUk0J8wcn2K3n6d");
+    expect(isAllowedFeishuDocument(`${PRODUCTION_FEISHU_DOC_URL}?fromScene=spaceOverview#block`)).toBe(true);
+    expect(isAllowedFeishuDocument("https://zhenfund.feishu.cn/wiki/LlhrwSLIvilANZk1opwcQGlUnNv")).toBe(false);
   });
 });
 
