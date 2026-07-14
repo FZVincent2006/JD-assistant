@@ -3,6 +3,8 @@ import { TEST_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
 import { buildFeishuOpenApiPlan, normalizeForMatch } from "../lib/feishuOpenApiPlan.js";
 import { verifyJdWrite, verifySummaryWrite } from "../lib/feishuWriteVerifier.js";
 
+const AMBIGUOUS_PAGE_NUMBERING_REASONS = new Set(["shortcut-rejected", "page-unavailable"]);
+
 export function createFeishuOpenApiWriter({ client, inspect, numberHeading, wait = defaultWait }) {
   if (typeof client?.request !== "function") throw new TypeError("A Feishu API client is required");
   if (typeof inspect !== "function") throw new TypeError("A Feishu inspect function is required");
@@ -138,14 +140,17 @@ async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
     try {
       await numberHeading(plan.companyName);
     } catch (error) {
+      const numberingStateUnknown = AMBIGUOUS_PAGE_NUMBERING_REASONS.has(error?.reason);
       return failedForError({
         draft,
         plan,
         completedStages,
         stage: "jd-numbering-page",
         error,
-        status: "partial",
-        repairHint: error?.message || "岗位 JD 内容已写入，但飞书页面自动编号失败；已停止 Portfolio 写入。"
+        status: numberingStateUnknown ? "unknown" : "partial",
+        repairHint: numberingStateUnknown
+          ? "岗位 JD 内容已写入，但飞书页面自动编号结果未知；不要重复提交，请先人工检查测试副本。"
+          : error?.message || "岗位 JD 内容已写入，但飞书页面自动编号失败；已停止 Portfolio 写入。"
       });
     }
 

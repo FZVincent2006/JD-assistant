@@ -28,6 +28,16 @@ function writerSetup({ snapshots, request, numberHeading = vi.fn().mockResolvedV
   };
 }
 
+function pageNumberingError(reason) {
+  return Object.assign(new Error(`page numbering failed: ${reason}`), {
+    stage: "jd-numbering-page",
+    reason,
+    status: 0,
+    code: 0,
+    logId: ""
+  });
+}
+
 describe("Feishu phased OpenAPI writer", () => {
   it("writes JD, numbers its heading on the page, verifies it, then writes the summary", async () => {
     const { writer, client, inspect, numberHeading, wait, values } = writerSetup();
@@ -58,22 +68,24 @@ describe("Feishu phased OpenAPI writer", () => {
       body: { index: values.plan.summaryTarget.index },
       stage: "summary-write"
     });
-    expect(client.request.mock.calls.flat().join(" ")).not.toContain("update_text_style");
+    const serializedRequests = JSON.stringify(client.request.mock.calls);
+    expect(serializedRequests).not.toContain('"PATCH"');
+    expect(serializedRequests).not.toContain("update_text_style");
     expect(inspect).toHaveBeenCalledTimes(4);
     expect(wait).toHaveBeenNthCalledWith(1, 400);
     expect(wait).toHaveBeenNthCalledWith(2, 400);
   });
 
-  it("stops after JD creation when page-assisted numbering fails", async () => {
-    const pageError = Object.assign(new Error("当前活动标签页不是指定飞书测试副本。"), {
-      stage: "jd-numbering-page",
-      reason: "wrong-document",
-      status: 0,
-      code: 0,
-      logId: ""
-    });
-    const { writer, client } = writerSetup({
-      numberHeading: vi.fn().mockRejectedValue(pageError)
+  it.each([
+    "wrong-document",
+    "heading-missing",
+    "heading-duplicate",
+    "already-numbered",
+    "not-editable"
+  ])("classifies deterministic page-numbering failure %s as partial", async (reason) => {
+    const numberHeading = vi.fn().mockRejectedValue(pageNumberingError(reason));
+    const { writer, client, inspect } = writerSetup({
+      numberHeading
     });
 
     const result = await writer.write(draft);
@@ -84,7 +96,33 @@ describe("Feishu phased OpenAPI writer", () => {
       completedStages: [],
       failedStage: "jd-numbering-page"
     });
+    expect(numberHeading).toHaveBeenCalledOnce();
     expect(client.request).toHaveBeenCalledTimes(1);
+    expect(inspect).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    "shortcut-rejected",
+    "page-unavailable"
+  ])("classifies ambiguous page-numbering failure %s as unknown", async (reason) => {
+    const numberHeading = vi.fn().mockRejectedValue(pageNumberingError(reason));
+    const { writer, client, inspect } = writerSetup({
+      numberHeading
+    });
+
+    const result = await writer.write(draft);
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "unknown",
+      completedStages: [],
+      failedStage: "jd-numbering-page"
+    });
+    expect(result.repairHint).toContain("不要重复提交");
+    expect(result.repairHint).toContain("测试副本");
+    expect(numberHeading).toHaveBeenCalledOnce();
+    expect(client.request).toHaveBeenCalledTimes(1);
+    expect(inspect).toHaveBeenCalledTimes(2);
   });
 
   it("reports JD-only partial success when summary creation fails", async () => {
