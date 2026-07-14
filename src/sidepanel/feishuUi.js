@@ -28,6 +28,13 @@ export function formatFeishuWriteStatus(result) {
   return `写入失败（${phaseLabel(result?.failedStage)}）：${detail}${diagnostics}`;
 }
 
+export function shouldOfferFeishuDocumentCheck(result) {
+  return result?.status === "partial"
+    || result?.status === "unknown"
+    || result?.failedStage === "jd-verify"
+    || result?.failedStage === "summary-verify";
+}
+
 function formatWriteDiagnostics(result = {}) {
   const diagnostics = [];
   const stage = phaseLabel(result.failedStage);

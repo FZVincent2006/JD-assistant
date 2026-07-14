@@ -4,6 +4,7 @@ import {
   describeFeishuPlan,
   formatFeishuOperationError,
   formatFeishuWriteStatus,
+  shouldOfferFeishuDocumentCheck,
   updateJobDraftField
 } from "../src/sidepanel/feishuUi.js";
 
@@ -47,6 +48,18 @@ describe("formatFeishuWriteStatus", () => {
   it("uses the production document in the safe fallback", () => {
     expect(formatFeishuWriteStatus({ status: "failed" }))
       .toContain("请检查正式招聘文档。");
+  });
+});
+
+describe("manual Feishu document check", () => {
+  it("offers the document only for partial, unknown, or verification failures", () => {
+    expect(shouldOfferFeishuDocumentCheck({ status: "partial" })).toBe(true);
+    expect(shouldOfferFeishuDocumentCheck({ status: "unknown" })).toBe(true);
+    expect(shouldOfferFeishuDocumentCheck({ status: "failed", failedStage: "jd-verify" })).toBe(true);
+    expect(shouldOfferFeishuDocumentCheck({ status: "failed", failedStage: "summary-verify" })).toBe(true);
+    expect(shouldOfferFeishuDocumentCheck({ status: "success" })).toBe(false);
+    expect(shouldOfferFeishuDocumentCheck({ status: "failed", failedStage: "preflight" })).toBe(false);
+    expect(shouldOfferFeishuDocumentCheck(null)).toBe(false);
   });
 });
 
