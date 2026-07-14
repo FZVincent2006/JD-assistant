@@ -1,6 +1,6 @@
 # 飞书 OpenAPI 招聘文档验收记录
 
-日期：2026-07-13  
+日期：2026-07-14
 分支：`codex/feishu-openapi-impl`  
 固定测试副本：`LlhrwSLIvilANZk1opwcQGlUnNv`
 
@@ -8,15 +8,26 @@
 
 ## 自动门禁
 
-- [x] `npm test -- --run`：25 个测试文件、167 项测试通过。
+- [x] `npm test`：32 个测试文件、233 项测试通过。
 - [x] Boss/脉脉保护文件哈希通过。
-- [x] `scripts/build-feishu-auth-helper.sh`：26 项 Swift 断言通过。
+- [x] `scripts/build-feishu-auth-helper.sh`：49 项 Swift 断言通过。
 - [x] 原生助手包含 `x86_64` 与 `arm64` 两种架构。
 - [x] `npm run build` 通过生产构建和 manifest 门禁。
+- [x] 构建门禁确认 `nativeMessaging`、`APPLY_HEADING_NUMBERING` 和安全页面准备消息存在，并拒绝旧的合成飞书快捷键路径。
 - [x] 生产 manifest 无剪贴板和 debugger 权限；飞书页面权限仅为 `https://zhenfund.feishu.cn/wiki/*`，且 content script 只注入顶层页面。
 - [ ] 在真实测试副本中确认扩展生成的 `Command + Shift + 7` 能让新公司 Heading 1 出现自动编号。
 - [ ] OpenAPI 回读确认 `sequence: "auto"` 后才写入 Portfolio。
 - [x] Boss/脉脉的六组 host 和 content-script match 保留。
+- [x] 原生助手请求仅允许固定的 `APPLY_HEADING_NUMBERING`，不接受键位、坐标或脚本参数。
+- [x] 自动化测试覆盖 `resume-new-company`，恢复路径不会再次创建岗位 JD。
+
+## 每台 Mac 的本机权限
+
+- [ ] Chrome/Edge 实际扩展 ID 已加入飞书应用回调并发布；不复用其他机器的未知 ID。
+- [ ] 安装脚本配置 Keychain 后请求辅助功能权限。
+- [ ] “系统设置 → 隐私与安全性 → 辅助功能”中已启用 `feishu-auth-host`。
+- [ ] 替换二进制后重新执行 `--check-accessibility`；必要时关闭并重新启用权限。
+- [x] 不需要屏幕录制、输入监控、完全磁盘访问或管理员权限。
 
 ## Chrome 只读检查
 
@@ -37,6 +48,14 @@
 - [ ] 两个岗位标题为根级同级块，岗位正文位于各自 QuoteContainer 内。
 - [ ] Portfolio Callout 首位为该公司，随后恰好两个岗位 Bullet。
 - [ ] 两区公司名、岗位名、岗位数量、地点和招聘类型一致。
+
+## CoFANCY JD-only 恢复
+
+- [ ] 浏览器只保留一个固定测试副本标签页并置于前台。
+- [ ] 相同语料生成 `resume-new-company`，计划明确跳过 JD 创建。
+- [ ] 只发送一次本机编号请求；若响应未知，只读回查且不自动重发。
+- [ ] OpenAPI 确认公司 Heading 1 为 `sequence: "auto"` 后，才在 Portfolio Callout 首位写入公司和两个岗位。
+- [ ] 完成后再次检查，文档中只有一个 CoFANCY JD 公司块和一个 Portfolio 公司块。
 
 ## 老公司追加
 

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,5 +43,13 @@ describe("Feishu native helper installer", () => {
   it("rejects malformed or non-extension origins", async () => {
     await expect(runInstallerDryRun(["https://example.com/"])).rejects.toMatchObject({ code: 2 });
     await expect(runInstallerDryRun(["chrome-extension://abc/"])).rejects.toMatchObject({ code: 2 });
+  });
+
+  it("requests only macOS Accessibility after installation", async () => {
+    const script = await readFile(installer, "utf8");
+
+    expect(script).toContain("--check-accessibility");
+    expect(script).toContain("--request-accessibility");
+    expect(script).not.toMatch(/tccutil|ScreenCapture|Input Monitoring/i);
   });
 });

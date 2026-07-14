@@ -13,4 +13,13 @@ describe("Feishu operator documentation", () => {
     );
     expect(readme).not.toContain("“部分完成”表示岗位 JD 已通过回读校验，但 Portfolio 未完成。");
   });
+
+  it("documents the four-Mac Accessibility setup and exact JD-only recovery", () => {
+    expect(readme).toContain("系统设置 → 隐私与安全性 → 辅助功能");
+    expect(readme).toContain("resume-new-company");
+    expect(readme).toContain("不会重复写入 JD");
+    expect(readme).toContain("只保留一个测试副本标签页");
+    expect(readme).toContain("不需要“屏幕录制”");
+    expect(readme).toContain("不要重复提交");
+  });
 });

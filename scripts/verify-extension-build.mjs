@@ -11,7 +11,7 @@ const permissions = new Set(manifest.permissions ?? []);
 for (const forbidden of ["clipboardRead", "clipboardWrite", "debugger"]) {
   if (permissions.has(forbidden)) throw new Error(`dist manifest contains forbidden permission: ${forbidden}`);
 }
-for (const required of ["identity", "storage"]) {
+for (const required of ["identity", "storage", "nativeMessaging"]) {
   if (!permissions.has(required)) throw new Error(`dist manifest is missing permission: ${required}`);
 }
 
@@ -71,4 +71,14 @@ for (const messageType of [
   "FEISHU_CLEAR_AUTH"
 ]) {
   if (!background.includes(messageType)) throw new Error(`dist background is missing ${messageType}`);
+}
+
+if (!background.includes("APPLY_HEADING_NUMBERING")) {
+  throw new Error("dist background is missing the fixed native heading-numbering request");
+}
+if (!content.includes("FEISHU_PREPARE_HEADING_NUMBERING")) {
+  throw new Error("dist content is missing safe Feishu heading preparation");
+}
+if (`${background}\n${content}`.includes("shortcut-rejected")) {
+  throw new Error("dist contains the removed synthetic page-shortcut path");
 }
