@@ -35,7 +35,7 @@ describe("Feishu native helper installer", () => {
       expect(manifest.name).toBe("cn.zhenfund.jd_assistant.feishu_auth");
       expect(manifest.type).toBe("stdio");
       expect(manifest.allowed_origins).toEqual([CHROME_ORIGIN, EDGE_ORIGIN]);
-      expect(manifest.path.startsWith("/")).toBe(true);
+      expect(manifest.path).toContain("Feishu JD Assistant Helper.app/Contents/MacOS/feishu-auth-host");
     }
     expect(await readdir(home)).toEqual([]);
   });
@@ -51,5 +51,6 @@ describe("Feishu native helper installer", () => {
     expect(script).toContain("--check-accessibility");
     expect(script).toContain("--request-accessibility");
     expect(script).not.toMatch(/tccutil|ScreenCapture|Input Monitoring/i);
+    expect(script).toContain("Feishu JD Assistant Helper.app");
   });
 });

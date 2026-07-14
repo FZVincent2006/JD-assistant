@@ -76,12 +76,12 @@ scripts/build-feishu-auth-helper.sh
    ```
 
 6. 脚本提示时粘贴 App Secret 并回车。输入不可见；Secret 只保存到当前用户 Keychain，service 为 `cn.zhenfund.jd-assistant.feishu`。
-7. 首次安装时，脚本会请求 macOS 辅助功能权限。打开“系统设置 → 隐私与安全性 → 辅助功能”，启用 `feishu-auth-host`；如果列表中的旧开关无效，关闭再启用一次。
+7. 首次安装时，脚本会通过系统启动带固定 Bundle ID 的 `Feishu JD Assistant Helper.app`。打开“系统设置 → 隐私与安全性 → 辅助功能”，启用“飞书 JD 助手”；如果列表中的旧开关无效，关闭再启用一次。
 8. 完全退出并重新打开 Chrome/Edge，重新加载扩展，选择“飞书文档”，点击“授权飞书”。
 
 安装程序在用户目录中写入 Chrome 和 Edge 的 Native Messaging manifest，不需要管理员权限、后台服务、开放端口或常驻进程。
 
-本机编号只需要“辅助功能”。不需要“屏幕录制”、输入监控、完全磁盘访问或管理员权限。更换 `feishu-auth-host` 二进制文件后，macOS 偶尔会要求在辅助功能列表中重新启用一次。四台 Mac 必须分别完成这项一次性设置；Chrome 与 Edge 的扩展 ID 也要分别以扩展页面实际显示为准。当前开发机 Edge 测试 ID 为 `nnfieabngjmimnogokgbccekfpdifgdb`，不要假设其他电脑或 Chrome 会使用相同 ID。
+本机编号只需要“辅助功能”。不需要“屏幕录制”、输入监控、完全磁盘访问或管理员权限。Native Messaging 进程不会直接请求权限，而是用 LaunchServices 启动“飞书 JD 助手”，确保 macOS 把权限归给助手的固定 Bundle ID，而不是整个 Chrome/Edge。更换助手应用后，macOS 偶尔会要求在辅助功能列表中重新启用一次。四台 Mac 必须分别完成这项一次性设置；Chrome 与 Edge 的扩展 ID 也要分别以扩展页面实际显示为准。当前开发机 Edge 测试 ID 为 `nnfieabngjmimnogokgbccekfpdifgdb`，不要假设其他电脑或 Chrome 会使用相同 ID。
 
 重新授权的日常成本较低：短期 token 过期后只需在侧栏再次点击“授权飞书”并确认；Keychain 中的 App Secret 不需要重复输入。只有 App Secret 被轮换、扩展 ID 改变、删除 Keychain 项或重装助手时，才需要重新配置本机助手。
 

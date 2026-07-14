@@ -905,7 +905,7 @@ git commit -m "docs: ship native Feishu numbering setup"
 ### Task 8: Install the verified build and complete test-copy acceptance
 
 **Files:**
-- Generated: `native-helper/.build/universal/feishu-auth-host`
+- Generated: `native-helper/.build/universal/Feishu JD Assistant Helper.app`
 - Generated: `dist/`
 - Sync target: `/Users/vincwnt/Documents/Auto ZhenFund/飞书OpenAPI测试扩展`
 - Update: `docs/testing/2026-07-13-feishu-openapi-acceptance.md`

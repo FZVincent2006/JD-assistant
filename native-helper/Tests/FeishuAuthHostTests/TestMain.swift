@@ -10,6 +10,7 @@ struct TestMain {
             count += try await runTokenExchangeTests()
             count += try await runNativeHostTests()
             count += try runHeadingNumberingTests()
+            count += try runCompanionBridgeTests()
             print("Native helper tests passed: \(count)")
         } catch {
             FileHandle.standardError.write(Data("Native helper tests failed: \(error)\n".utf8))

@@ -104,10 +104,10 @@ OpenAPI 是最终事实来源。本机助手返回后，后台进行有限次数
 
 ## 权限、安装与升级
 
-- 继续使用 `~/Library/Application Support/ZhenFund JD Assistant/feishu-auth-host` 的稳定安装路径，以及现有 Chrome/Edge Native Messaging manifests。
+- 使用 `~/Library/Application Support/ZhenFund JD Assistant/Feishu JD Assistant Helper.app` 的稳定应用路径；Chrome/Edge Native Messaging manifests 指向应用内的 `Contents/MacOS/feishu-auth-host`。
 - 构建产物继续为 arm64 与 x86_64 合并的 universal binary。
 - 安装脚本在首次安装或本机助手升级后触发辅助功能权限检查；未授权时由 macOS 引导用户前往“隐私与安全性 → 辅助功能”。
-- 授权对象是 `feishu-auth-host`，不是整个浏览器；不申请录屏、输入监控或完全磁盘访问。
+- 授权对象是固定 Bundle ID `cn.zhenfund.jd-assistant.feishu-helper` 的“飞书 JD 助手”，不是整个浏览器；不申请录屏、输入监控或完全磁盘访问。Native Messaging 子进程通过 LaunchServices 启动同一应用的受限 companion 动作，以避免 macOS 把裸命令行进程的 TCC 请求归因给启动它的浏览器。
 - 正常使用期间权限持续有效。替换本机助手二进制、修改代码签名或重置 macOS 隐私设置后，系统可能要求重新启用一次权限；界面必须把这种情况与飞书 OAuth 重新授权区分开。
 - Chrome 和 Edge 使用相同助手二进制，但各自仍需存在 Native Messaging manifest。四台 Mac 分别完成一次安装和辅助功能授权。
 

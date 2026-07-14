@@ -10,7 +10,7 @@
 
 - [x] `npm test`：32 个测试文件、233 项测试通过。
 - [x] Boss/脉脉保护文件哈希通过。
-- [x] `scripts/build-feishu-auth-helper.sh`：49 项 Swift 断言通过。
+- [x] `scripts/build-feishu-auth-helper.sh`：64 项 Swift 断言通过。
 - [x] 原生助手包含 `x86_64` 与 `arm64` 两种架构。
 - [x] `npm run build` 通过生产构建和 manifest 门禁。
 - [x] 构建门禁确认 `nativeMessaging`、`APPLY_HEADING_NUMBERING` 和安全页面准备消息存在，并拒绝旧的合成飞书快捷键路径。
@@ -25,7 +25,8 @@
 
 - [ ] Chrome/Edge 实际扩展 ID 已加入飞书应用回调并发布；不复用其他机器的未知 ID。
 - [ ] 安装脚本配置 Keychain 后请求辅助功能权限。
-- [ ] “系统设置 → 隐私与安全性 → 辅助功能”中已启用 `feishu-auth-host`。
+- [ ] “系统设置 → 隐私与安全性 → 辅助功能”中已启用“飞书 JD 助手”（Bundle ID `cn.zhenfund.jd-assistant.feishu-helper`）。
+- [x] TCC 日志确认辅助功能和 PostEvent 请求主体是助手 Bundle ID，不是 Codex、Chrome 或 Edge。
 - [ ] 替换二进制后重新执行 `--check-accessibility`；必要时关闭并重新启用权限。
 - [x] 不需要屏幕录制、输入监控、完全磁盘访问或管理员权限。
 

@@ -1,5 +1,5 @@
 import AppKit
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import Foundation
 
 package protocol HeadingNumbering: Sendable {
@@ -59,8 +59,13 @@ package struct MacHeadingEnvironment: HeadingNumberingEnvironment {
     package init() {}
 
     package func hasPostEventAccess(prompt: Bool) -> Bool {
-        if CGPreflightPostEventAccess() { return true }
-        return prompt ? CGRequestPostEventAccess() : false
+        let options = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: prompt as CFBoolean
+        ] as CFDictionary
+        let accessibilityTrusted = AXIsProcessTrustedWithOptions(options)
+        let eventPostingAllowed = CGPreflightPostEventAccess()
+            || (prompt && CGRequestPostEventAccess())
+        return accessibilityTrusted && eventPostingAllowed
     }
 
     package func frontmostBundleIdentifier() -> String? {

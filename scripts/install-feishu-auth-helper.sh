@@ -5,9 +5,11 @@ HOST_NAME="cn.zhenfund.jd_assistant.feishu_auth"
 APP_ID="cli_aade4224b8789bef"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SOURCE_BINARY="$ROOT_DIR/native-helper/.build/universal/feishu-auth-host"
+SOURCE_APP="$ROOT_DIR/native-helper/.build/universal/Feishu JD Assistant Helper.app"
 INSTALL_DIR="$HOME/Library/Application Support/ZhenFund JD Assistant"
-INSTALL_BINARY="$INSTALL_DIR/feishu-auth-host"
+INSTALL_APP="$INSTALL_DIR/Feishu JD Assistant Helper.app"
+INSTALL_BINARY="$INSTALL_APP/Contents/MacOS/feishu-auth-host"
+LEGACY_BINARY="$INSTALL_DIR/feishu-auth-host"
 CHROME_MANIFEST="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/$HOST_NAME.json"
 EDGE_MANIFEST="$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts/$HOST_NAME.json"
 
@@ -63,11 +65,12 @@ if [[ "$MODE" == "uninstall" ]]; then
   if [[ "$DELETE_SECRET" -eq 1 ]]; then
     if [[ -x "$INSTALL_BINARY" ]]; then
       "$INSTALL_BINARY" --delete-secret --app-id "$APP_ID"
-    elif [[ -x "$SOURCE_BINARY" ]]; then
-      "$SOURCE_BINARY" --delete-secret --app-id "$APP_ID"
+    elif [[ -x "$SOURCE_APP/Contents/MacOS/feishu-auth-host" ]]; then
+      "$SOURCE_APP/Contents/MacOS/feishu-auth-host" --delete-secret --app-id "$APP_ID"
     fi
   fi
-  rm -f "$CHROME_MANIFEST" "$EDGE_MANIFEST" "$INSTALL_BINARY"
+  rm -f "$CHROME_MANIFEST" "$EDGE_MANIFEST" "$LEGACY_BINARY"
+  rm -rf "$INSTALL_APP"
   exit 0
 fi
 
@@ -88,13 +91,15 @@ if [[ "$MODE" == "dry-run" ]]; then
   exit 0
 fi
 
-[[ -x "$SOURCE_BINARY" ]] || {
+[[ -x "$SOURCE_APP/Contents/MacOS/feishu-auth-host" ]] || {
   printf '%s\n' "Native helper is not built. Run scripts/build-feishu-auth-helper.sh first." >&2
   exit 1
 }
 
 mkdir -p "$INSTALL_DIR" "$(dirname "$CHROME_MANIFEST")" "$(dirname "$EDGE_MANIFEST")"
-install -m 0700 "$SOURCE_BINARY" "$INSTALL_BINARY"
+rm -rf "$INSTALL_APP"
+ditto "$SOURCE_APP" "$INSTALL_APP"
+rm -f "$LEGACY_BINARY"
 printf '%s\n' "$MANIFEST_JSON" > "$CHROME_MANIFEST"
 printf '%s\n' "$MANIFEST_JSON" > "$EDGE_MANIFEST"
 chmod 0600 "$CHROME_MANIFEST" "$EDGE_MANIFEST"
@@ -102,12 +107,12 @@ chmod 0600 "$CHROME_MANIFEST" "$EDGE_MANIFEST"
 printf '%s\n' "Paste the Feishu App Secret, then press Return (input is hidden):" >&2
 "$INSTALL_BINARY" --configure-secret --app-id "$APP_ID" < /dev/tty
 if ! "$INSTALL_BINARY" --check-accessibility; then
-  printf '%s\n' "Requesting macOS Accessibility permission for feishu-auth-host..." >&2
+  printf '%s\n' "Requesting macOS Accessibility permission for 飞书 JD 助手..." >&2
   "$INSTALL_BINARY" --request-accessibility || true
 fi
 if "$INSTALL_BINARY" --check-accessibility; then
   printf '%s\n' "macOS Accessibility permission is enabled." >&2
 else
-  printf '%s\n' "Enable feishu-auth-host in System Settings > Privacy & Security > Accessibility, then retry." >&2
+  printf '%s\n' "Enable 飞书 JD 助手 in System Settings > Privacy & Security > Accessibility, then retry." >&2
 fi
 printf '%s\n' "Feishu authorization helper installed for Chrome and Edge." >&2

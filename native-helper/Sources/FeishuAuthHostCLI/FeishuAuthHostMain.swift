@@ -6,12 +6,16 @@ import Foundation
 struct FeishuAuthHostMain {
     static func main() async {
         let arguments = Array(CommandLine.arguments.dropFirst())
+        if arguments.first == "--companion-action" {
+            exit(runCompanionCommand(arguments: arguments) ? 0 : 2)
+        }
+
         if arguments == ["--check-accessibility"] {
-            exit(MacHeadingEnvironment().hasPostEventAccess(prompt: false) ? 0 : 1)
+            exit(CompanionAccessibility().check(prompt: false) ? 0 : 1)
         }
 
         if arguments == ["--request-accessibility"] {
-            exit(MacHeadingEnvironment().hasPostEventAccess(prompt: true) ? 0 : 1)
+            exit(CompanionAccessibility().check(prompt: true) ? 0 : 1)
         }
 
         if arguments.first == "--configure-secret" {
@@ -58,7 +62,7 @@ struct FeishuAuthHostMain {
             try await runNativeHost(
                 input: input,
                 output: output,
-                headingNumberer: MacHeadingNumberer()
+                headingNumberer: CompanionHeadingNumberer()
             )
         } catch {
             exit(1)
