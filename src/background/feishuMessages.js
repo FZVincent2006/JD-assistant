@@ -4,8 +4,6 @@ import { inspectRecruitingDocument } from "../lib/feishuTemplateReader.js";
 import { createFeishuApiClient } from "./feishuApiClient.js";
 import { createFeishuAuth } from "./feishuAuth.js";
 import { createFeishuOpenApiWriter } from "./feishuOpenApiWriter.js";
-import { createFeishuNativeNumbering } from "./feishuNativeNumbering.js";
-import { createFeishuPageNumbering } from "./feishuPageNumbering.js";
 import { resolveFixedTestDocument } from "./feishuWikiResolver.js";
 
 const FEISHU_MESSAGE_TYPES = new Set([
@@ -40,20 +38,11 @@ export function createFeishuBackgroundServices({ chromeApi = chrome, fetchImpl =
       title: document.title
     };
   };
-  const pageNumbering = createFeishuPageNumbering({ chromeApi });
-  const nativeNumbering = createFeishuNativeNumbering({ chromeApi });
-  const numberHeading = async (companyName) => {
-    const prepared = await pageNumbering.prepare(companyName);
-    if (prepared.state === "already-numbered") return prepared;
-    await nativeNumbering.apply();
-    return { ok: true, state: "event-sent" };
-  };
   const writer = createFeishuOpenApiWriter({
     client,
-    inspect,
-    numberHeading
+    inspect
   });
-  return { auth, client, inspect, writer, pageNumbering, nativeNumbering };
+  return { auth, client, inspect, writer };
 }
 
 export async function handleFeishuBackgroundMessage(message, services) {

@@ -106,13 +106,4 @@ chmod 0600 "$CHROME_MANIFEST" "$EDGE_MANIFEST"
 
 printf '%s\n' "Paste the Feishu App Secret, then press Return (input is hidden):" >&2
 "$INSTALL_BINARY" --configure-secret --app-id "$APP_ID" < /dev/tty
-if ! "$INSTALL_BINARY" --check-accessibility; then
-  printf '%s\n' "Requesting macOS Accessibility permission for 飞书 JD 助手..." >&2
-  "$INSTALL_BINARY" --request-accessibility || true
-fi
-if "$INSTALL_BINARY" --check-accessibility; then
-  printf '%s\n' "macOS Accessibility permission is enabled." >&2
-else
-  printf '%s\n' "Enable 飞书 JD 助手 in System Settings > Privacy & Security > Accessibility, then retry." >&2
-fi
 printf '%s\n' "Feishu authorization helper installed for Chrome and Edge." >&2

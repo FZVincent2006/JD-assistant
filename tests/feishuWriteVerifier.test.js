@@ -4,6 +4,12 @@ import { verifyJdWrite, verifySummaryWrite } from "../src/lib/feishuWriteVerifie
 import { draft, initialSnapshot, successfulSnapshots } from "./helpers/feishuWriteScenario.js";
 
 describe("Feishu persisted-write verification", () => {
+  it("accepts a root Heading 1 without Feishu automatic numbering", () => {
+    const { plan, unnumberedJd } = successfulSnapshots();
+
+    expect(verifyJdWrite(unnumberedJd, plan)).toEqual({ ok: true, errors: [] });
+  });
+
   it("accepts only the complete root-level JD and exact summary structure", () => {
     const { plan, jd, complete } = successfulSnapshots();
 
@@ -44,26 +50,12 @@ describe("Feishu persisted-write verification", () => {
     expect(verifyJdWrite(jd, plan)).toEqual({ ok: true, errors: [] });
   });
 
-  it("requires Feishu automatic numbering on a newly inserted company Heading 1", () => {
-    const { plan, unnumberedJd } = successfulSnapshots();
-
-    const result = verifyJdWrite(unnumberedJd, plan);
-
-    expect(result.ok).toBe(false);
-    expect(result.errors.join(" ")).toContain("自动编号");
-    expect(verifyJdWrite(unnumberedJd, plan, { requireNumbering: false })).toEqual({
-      ok: true,
-      errors: []
-    });
-  });
-
-  it("requires automatic numbering and verifies both sections during JD-only recovery", () => {
-    const { unnumberedJd, jd, complete } = successfulSnapshots();
+  it("verifies both sections during an unnumbered JD-only recovery", () => {
+    const { unnumberedJd, complete } = successfulSnapshots();
     const plan = buildFeishuOpenApiPlan(unnumberedJd, draft);
 
     expect(plan.mode).toBe("resume-new-company");
-    expect(verifyJdWrite(unnumberedJd, plan).errors.join(" ")).toContain("自动编号");
-    expect(verifyJdWrite(jd, plan)).toEqual({ ok: true, errors: [] });
+    expect(verifyJdWrite(unnumberedJd, plan)).toEqual({ ok: true, errors: [] });
     expect(verifySummaryWrite(complete, plan)).toEqual({ ok: true, errors: [] });
   });
 

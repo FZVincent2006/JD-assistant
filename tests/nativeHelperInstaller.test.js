@@ -45,11 +45,11 @@ describe("Feishu native helper installer", () => {
     await expect(runInstallerDryRun(["chrome-extension://abc/"])).rejects.toMatchObject({ code: 2 });
   });
 
-  it("requests only macOS Accessibility after installation", async () => {
+  it("does not request macOS Accessibility after installation", async () => {
     const script = await readFile(installer, "utf8");
 
-    expect(script).toContain("--check-accessibility");
-    expect(script).toContain("--request-accessibility");
+    expect(script).not.toContain("--check-accessibility");
+    expect(script).not.toContain("--request-accessibility");
     expect(script).not.toMatch(/tccutil|ScreenCapture|Input Monitoring/i);
     expect(script).toContain("Feishu JD Assistant Helper.app");
   });

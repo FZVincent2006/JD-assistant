@@ -9,7 +9,7 @@ export function formatFeishuWriteStatus(result) {
   const diagnostics = formatWriteDiagnostics(result);
   if (result?.ok || result?.status === "success") {
     if (result.mode === "resume-new-company") {
-      return `恢复成功：未重复写入 JD，已完成自动编号和 Portfolio 汇总。${diagnostics}`;
+      return `恢复成功：未重复写入 JD，已完成 Portfolio 汇总。${diagnostics}`;
     }
     const action = result.mode === "append-jobs" ? "新岗位已追加" : "新公司已更新";
     return `写入成功：${action} JD 区和岗位汇总区。${diagnostics}`;
@@ -17,9 +17,7 @@ export function formatFeishuWriteStatus(result) {
   const detail = result?.repairHint || result?.error || "请检查测试副本文档。";
   const jdConfirmed = (result?.completedStages ?? []).includes("jd");
   if (result?.status === "partial" || jdConfirmed) {
-    const prefix = result.mode === "resume-new-company" && !jdConfirmed
-      ? "恢复未完成：现有岗位 JD 已确认存在，但自动编号尚未确认；Portfolio 区未写入。"
-      : jdConfirmed
+    const prefix = jdConfirmed
       ? "部分完成：岗位 JD 区已确认写入；Portfolio 区未完成。"
       : "部分完成：岗位 JD 内容已写入但尚未确认完成；Portfolio 区未写入。";
     return `${prefix}${detail}${diagnostics}`;
@@ -87,7 +85,7 @@ export function describeFeishuPlan(plan) {
   return {
     title: isAppend ? "老公司追加岗位" : isResume ? "恢复未完成的新公司" : "新公司置顶",
     position: isResume
-      ? "岗位 JD 已存在且与本次草稿完全一致；不会重复写 JD，只补公司一级标题自动编号，校验后将公司插入 Portfolio 汇总首位。"
+      ? "岗位 JD 已存在且与本次草稿完全一致；不会重复写 JD，将直接把公司插入 Portfolio 汇总首位。"
       : isAppend
       ? "将在 Portfolio 与岗位 JD 的原公司分组末尾追加，不创建第二个公司块。"
       : "将公司插入 Portfolio 汇总首位，并在“岗位JD整理”下以根级一级标题置顶。",
@@ -102,8 +100,6 @@ function phaseLabel(stage) {
     preflight: "写入前检查",
     "jd-write": "岗位 JD 写入",
     "jd-verify": "岗位 JD 校验",
-    "jd-numbering-page": "页面自动编号",
-    "jd-numbering-verify": "自动编号校验",
     "summary-write": "Portfolio 写入",
     "summary-verify": "Portfolio 校验"
   };

@@ -3,11 +3,10 @@ import manifest from "../public/manifest.json";
 import { applyFeishuAuthMode } from "../src/lib/manifestAuthMode.js";
 
 describe("extension manifest", () => {
-  it("adds only the test-copy page permission without clipboard or debugger", () => {
+  it("uses Feishu API permissions without injecting a script into Feishu pages", () => {
     const approvedFeishuHosts = [
       "https://accounts.feishu.cn/*",
-      "https://open.feishu.cn/*",
-      "https://zhenfund.feishu.cn/wiki/*"
+      "https://open.feishu.cn/*"
     ];
     expect(manifest.permissions).toEqual(expect.arrayContaining(["identity", "storage"]));
     expect(manifest.permissions).not.toEqual(expect.arrayContaining(["clipboardRead", "clipboardWrite", "debugger"]));
@@ -16,12 +15,7 @@ describe("extension manifest", () => {
       .toEqual(approvedFeishuHosts);
     const feishuEntries = manifest.content_scripts.filter((entry) =>
       entry.matches.some((match) => match.includes("feishu.cn")));
-    expect(feishuEntries).toEqual([{
-      matches: ["https://zhenfund.feishu.cn/wiki/*"],
-      js: ["content.js"],
-      run_at: "document_idle",
-      all_frames: false
-    }]);
+    expect(feishuEntries).toEqual([]);
   });
 
   it("preserves every existing Boss and Maimai host and content-script match", () => {

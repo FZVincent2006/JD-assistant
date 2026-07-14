@@ -1,12 +1,11 @@
 import { renderJdDescendants, renderSummaryDescendants } from "../lib/feishuBlockRenderer.js";
 import { TEST_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
-import { buildFeishuOpenApiPlan, normalizeForMatch } from "../lib/feishuOpenApiPlan.js";
+import { buildFeishuOpenApiPlan } from "../lib/feishuOpenApiPlan.js";
 import { verifyJdWrite, verifySummaryWrite } from "../lib/feishuWriteVerifier.js";
 
-export function createFeishuOpenApiWriter({ client, inspect, numberHeading, wait = defaultWait }) {
+export function createFeishuOpenApiWriter({ client, inspect, wait = defaultWait }) {
   if (typeof client?.request !== "function") throw new TypeError("A Feishu API client is required");
   if (typeof inspect !== "function") throw new TypeError("A Feishu inspect function is required");
-  if (typeof numberHeading !== "function") throw new TypeError("A Feishu page numberer is required");
   if (typeof wait !== "function") throw new TypeError("A wait function is required");
   let writing = false;
 
@@ -21,7 +20,7 @@ export function createFeishuOpenApiWriter({ client, inspect, numberHeading, wait
     }
     writing = true;
     try {
-      return await executeWrite({ client, inspect, numberHeading, wait, draft });
+      return await executeWrite({ client, inspect, wait, draft });
     } finally {
       writing = false;
     }
@@ -30,7 +29,7 @@ export function createFeishuOpenApiWriter({ client, inspect, numberHeading, wait
   return { write };
 }
 
-async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
+async function executeWrite({ client, inspect, wait, draft }) {
   let initial;
   try {
     initial = await inspect();
@@ -110,7 +109,7 @@ async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
           repairHint: "岗位 JD 写入请求状态未知且无法回读；不要重复提交，请先人工检查测试副本。"
         });
       }
-      const timeoutVerification = verifyJdWrite(afterJd, plan, { requireNumbering: false });
+      const timeoutVerification = verifyJdWrite(afterJd, plan);
       if (!timeoutVerification.ok) {
         return failedForError({
           draft,
@@ -124,7 +123,7 @@ async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
     }
   }
 
-  const jdContentVerification = verifyJdWrite(afterJd, plan, { requireNumbering: false });
+  const jdContentVerification = verifyJdWrite(afterJd, plan);
   if (!jdContentVerification.ok) {
     return makeResult({
       draft,
@@ -136,66 +135,6 @@ async function executeWrite({ client, inspect, numberHeading, wait, draft }) {
     });
   }
 
-  let numberingAttempted = false;
-  if (isNewCompanyMode(plan.mode) && !hasAutomaticHeadingNumbering(afterJd, plan.companyName)) {
-    numberingAttempted = true;
-    let numberingVerified = false;
-    try {
-      await numberHeading(plan.companyName);
-    } catch (error) {
-      if (!error?.ambiguous) {
-        return failedForError({
-          draft,
-          plan,
-          completedStages,
-          stage: "jd-numbering-page",
-          error,
-          status: "partial",
-          repairHint: numberingRepairHint(error)
-        });
-      }
-      const readBack = await waitForNumberedJd({ inspect, wait, plan, attempts: 5 });
-      if (!readBack) {
-        return failedForError({
-          draft,
-          plan,
-          completedStages,
-          stage: "jd-numbering-page",
-          error,
-          status: "unknown",
-          repairHint: "本机编号结果未知且 OpenAPI 未确认自动编号；不要重复提交，请先人工检查测试副本。"
-        });
-      }
-      afterJd = readBack;
-      numberingVerified = true;
-    }
-
-    if (!numberingVerified) {
-      afterJd = await waitForNumberedJd({ inspect, wait, plan, attempts: 5 });
-    }
-    if (!afterJd || !verifyJdWrite(afterJd, plan).ok) {
-      return makeResult({
-        draft,
-        plan,
-        completedStages,
-        status: "partial",
-        failedStage: "jd-numbering-verify",
-        repairHint: "飞书页面已执行编号操作，但 OpenAPI 未在限定时间内确认自动编号；已停止 Portfolio 写入。"
-      });
-    }
-  }
-
-  const jdVerification = verifyJdWrite(afterJd, plan);
-  if (!jdVerification.ok) {
-    return makeResult({
-      draft,
-      plan,
-      completedStages,
-      status: numberingAttempted ? "partial" : "failed",
-      failedStage: numberingAttempted ? "jd-numbering-verify" : "jd-verify",
-      repairHint: `岗位 JD 区写入后结构校验失败：${jdVerification.errors.join("；")}`
-    });
-  }
   completedStages.push("jd");
 
   let afterSummary;
@@ -288,31 +227,6 @@ async function createDescendants(client, documentId, target, revisionId, request
   );
 }
 
-async function waitForNumberedJd({ inspect, wait, plan, attempts }) {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    if (attempt > 0) await wait(400);
-    let snapshot;
-    try {
-      snapshot = await inspect();
-    } catch {
-      return null;
-    }
-    if (verifyJdWrite(snapshot, plan).ok) return snapshot;
-  }
-  return null;
-}
-
-function findJdCompany(snapshot, companyName) {
-  const normalizedName = normalizeForMatch(companyName);
-  return (snapshot.jd?.companies ?? []).find(
-    (company) => normalizeForMatch(company.name) === normalizedName
-  );
-}
-
-function hasAutomaticHeadingNumbering(snapshot, companyName) {
-  return findJdCompany(snapshot, companyName)?.headingSequence === "auto";
-}
-
 function failedForError({
   draft,
   plan,
@@ -363,23 +277,6 @@ function makeResult({
 
 function isAmbiguousNetworkError(error) {
   return error?.status === 0 && error?.code === 0;
-}
-
-function isNewCompanyMode(mode) {
-  return mode === "new-company" || mode === "resume-new-company";
-}
-
-function numberingRepairHint(error) {
-  const hints = {
-    "accessibility-not-granted": "未获得 macOS 辅助功能权限；请在系统设置中允许飞书授权助手控制电脑，然后重试。",
-    "unsupported-front-app": "当前最前方不是受支持的 Chrome 或 Edge；请打开测试副本并保持浏览器在前台。",
-    "web-area-missing": "未在当前浏览器窗口找到测试副本页面；请打开固定测试副本后重试。",
-    "web-area-focus-failed": "无法把焦点放到测试副本文档；请点击文档页面后重试。",
-    "native-event-failed": "本机未能发送固定的自动编号快捷键；已停止 Portfolio 写入。"
-  };
-  return hints[error?.reason]
-    ?? error?.message
-    ?? "岗位 JD 内容已写入，但飞书页面自动编号失败；已停止 Portfolio 写入。";
 }
 
 function defaultWait(milliseconds) {

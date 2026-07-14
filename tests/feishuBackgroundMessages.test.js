@@ -28,15 +28,15 @@ function services(overrides = {}) {
 }
 
 describe("Feishu service-worker messages", () => {
-  it("exposes page numbering through the shared background services", () => {
+  it("does not expose or initialize page-numbering services", () => {
     const chromeApi = {
       storage: { session: {} },
       tabs: { query: vi.fn(), sendMessage: vi.fn() }
     };
     const current = createFeishuBackgroundServices({ chromeApi, fetchImpl: vi.fn() });
 
-    expect(current.pageNumbering).toEqual({ prepare: expect.any(Function) });
-    expect(current.nativeNumbering).toEqual({ apply: expect.any(Function) });
+    expect(current).not.toHaveProperty("pageNumbering");
+    expect(current).not.toHaveProperty("nativeNumbering");
   });
 
   it("routes auth lifecycle messages without returning an access token", async () => {

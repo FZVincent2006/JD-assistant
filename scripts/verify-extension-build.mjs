@@ -15,11 +15,9 @@ for (const required of ["identity", "storage", "nativeMessaging"]) {
   if (!permissions.has(required)) throw new Error(`dist manifest is missing permission: ${required}`);
 }
 
-const feishuPageMatch = "https://zhenfund.feishu.cn/wiki/*";
 const approvedFeishuHosts = [
   "https://accounts.feishu.cn/*",
-  "https://open.feishu.cn/*",
-  feishuPageMatch
+  "https://open.feishu.cn/*"
 ];
 const hostPermissionValues = manifest.host_permissions ?? [];
 const hostPermissions = new Set(hostPermissionValues);
@@ -49,17 +47,8 @@ for (const required of recruitingMatches) {
 }
 const feishuEntries = contentScripts.filter((script) =>
   (script.matches ?? []).some((match) => match.includes("feishu.cn")));
-if (feishuEntries.length !== 1) {
-  throw new Error("dist manifest must contain exactly one Feishu content-script entry");
-}
-const [feishuEntry] = feishuEntries;
-if (feishuEntry.matches?.length !== 1
-  || feishuEntry.matches[0] !== feishuPageMatch
-  || feishuEntry.js?.length !== 1
-  || feishuEntry.js[0] !== "content.js"
-  || feishuEntry.run_at !== "document_idle"
-  || feishuEntry.all_frames !== false) {
-  throw new Error("dist manifest Feishu content-script entry is broader than the approved top-frame test copy");
+if (feishuEntries.length !== 0) {
+  throw new Error("dist manifest must not inject a content script into Feishu pages");
 }
 
 for (const messageType of [
@@ -73,11 +62,11 @@ for (const messageType of [
   if (!background.includes(messageType)) throw new Error(`dist background is missing ${messageType}`);
 }
 
-if (!background.includes("APPLY_HEADING_NUMBERING")) {
-  throw new Error("dist background is missing the fixed native heading-numbering request");
+if (background.includes("APPLY_HEADING_NUMBERING")) {
+  throw new Error("dist background still contains the removed native heading-numbering request");
 }
-if (!content.includes("FEISHU_PREPARE_HEADING_NUMBERING")) {
-  throw new Error("dist content is missing safe Feishu heading preparation");
+if (content.includes("FEISHU_PREPARE_HEADING_NUMBERING")) {
+  throw new Error("dist content still contains the removed Feishu heading preparation route");
 }
 if (`${background}\n${content}`.includes("shortcut-rejected")) {
   throw new Error("dist contains the removed synthetic page-shortcut path");

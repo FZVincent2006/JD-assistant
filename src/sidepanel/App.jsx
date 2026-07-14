@@ -227,7 +227,7 @@ function App() {
     setWriting(true);
     setWriteResult(null);
     setStatus(writePlan.mode === "resume-new-company"
-      ? "正在恢复测试副本：不重复写 JD，先确认公司标题自动编号，再补 Portfolio…"
+      ? "正在恢复测试副本：不重复写 JD，直接补 Portfolio…"
       : "正在写入测试副本：先更新 JD 区，再更新岗位汇总区…");
     try {
       const response = await sendFeishuWriteRequest(companyDraft);
@@ -399,7 +399,7 @@ function FeishuAccessPanel({ authStatus, inspection, writing, onAuthorize, onIns
         </button>
       </div>
       <p className="helperText">
-        首次使用需在 macOS“系统设置 → 隐私与安全性 → 辅助功能”中允许飞书授权助手；执行编号时请保持 Chrome 或 Edge 的测试副本在前台。
+        公司名称会写成根级一级标题；如需“1.”自动序号，请在写入成功后到飞书中手动设置。无需开启 macOS 辅助功能权限。
       </p>
       {inspection && (
         <div className="inspectionSummary">
