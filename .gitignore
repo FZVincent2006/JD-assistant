@@ -4,3 +4,4 @@ dist/
 .worktrees/
 .env.local
 .build/
+release/

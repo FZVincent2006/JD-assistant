@@ -26,4 +26,21 @@ describe("colleague distribution entry", () => {
     expect(guide).toContain("手动");
     expect(guide).toContain("旧版本");
   });
+
+  it("builds and verifies a release without private-key material", () => {
+    const gitignore = read(".gitignore");
+    const buildScript = read("scripts/build-colleague-distribution.sh");
+    const verifier = read("scripts/verify-colleague-distribution.mjs");
+
+    expect(gitignore).toContain("release/");
+    expect(buildScript).toContain("npm test");
+    expect(buildScript).toContain("npm run build");
+    expect(buildScript).toContain("build-feishu-auth-helper.sh");
+    expect(buildScript).toContain("/usr/bin/ditto");
+    expect(buildScript).toContain("verify-colleague-distribution.mjs");
+    expect(verifier).toContain("pem|p12|key");
+    expect(verifier).toContain("PRIVATE KEY");
+    expect(verifier).toContain("SHA256SUMS.txt");
+    expect(verifier).toContain("extensionJavaScript");
+  });
 });
