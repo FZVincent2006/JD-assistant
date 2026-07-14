@@ -118,8 +118,8 @@ function publicErrorMessage(stage, internalMessage, reasonCode, context = {}) {
     "portfolio-callout": "Portfolio 区未能唯一识别岗位汇总高亮块。文档不会被修改。",
     "portfolio-template": "Portfolio 区至少有一个公司块不符合固定模板。文档不会被修改。",
     "jd-template": "岗位 JD 区至少有一个公司块不符合固定模板。文档不会被修改。",
-    "style-template": "测试副本缺少生成新内容所需的样式模板。文档不会被修改。",
-    "template-unknown": "无法识别测试副本的招聘模板结构。文档不会被修改。"
+    "style-template": "正式招聘文档缺少生成新内容所需的样式模板。文档不会被修改。",
+    "template-unknown": "无法识别正式招聘文档的招聘模板结构。文档不会被修改。"
   };
   if (inspectionReasons[reasonCode]) return inspectionReasons[reasonCode];
   const companyName = safePublicLabel(context.companyName, "未知公司");

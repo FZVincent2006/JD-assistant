@@ -179,20 +179,20 @@ function App() {
     setInspection(null);
     setWritePlan(null);
     setWriteResult(null);
-    setStatus("飞书授权成功，可以检查测试副本。");
+    setStatus("飞书授权成功，可以检查正式招聘文档。");
   }
 
-  async function inspectFeishuCopy() {
-    setStatus("正在通过 OpenAPI 检查飞书测试副本，请稍候…");
+  async function inspectFeishuDocument() {
+    setStatus("正在通过 OpenAPI 检查正式招聘文档，请稍候…");
     const response = await sendFeishuInspectRequest();
     if (!response?.ok) {
-      setStatus(formatFeishuOperationError(response, "测试副本检查失败。"));
+      setStatus(formatFeishuOperationError(response, "正式招聘文档检查失败。"));
       return;
     }
     setInspection(response.inspection);
     setWritePlan(null);
     setWriteResult(null);
-    setStatus(`测试副本检查完成：版本 ${response.inspection.revisionId}，Portfolio ${response.inspection.portfolioCompanyCount} 家，岗位 JD ${response.inspection.jdCompanyCount} 家。`);
+    setStatus(`正式招聘文档检查完成：版本 ${response.inspection.revisionId}，Portfolio ${response.inspection.portfolioCompanyCount} 家，岗位 JD ${response.inspection.jdCompanyCount} 家。`);
   }
 
   async function generateFeishuPlan() {
@@ -216,19 +216,19 @@ function App() {
       : `计划不可执行：${response.plan.errors.join("；")}`);
   }
 
-  async function writeFeishuCopy() {
+  async function writeFeishuDocument() {
     if (!companyDraft || !feishuReady) {
       setStatus("请先完成授权、检查并生成与当前文档版本一致的有效计划。");
       return;
     }
     const planDescription = describeFeishuPlan(writePlan);
-    const confirmed = window.confirm(`计划：${planDescription.title}\n公司：${companyDraft.companyName}\n岗位：${writePlan.jobs.length} 个\n仅写入飞书测试副本。确认继续？`);
+    const confirmed = window.confirm(`计划：${planDescription.title}\n公司：${companyDraft.companyName}\n岗位：${writePlan.jobs.length} 个\n仅写入正式招聘文档。确认继续？`);
     if (!confirmed) return;
     setWriting(true);
     setWriteResult(null);
     setStatus(writePlan.mode === "resume-new-company"
-      ? "正在恢复测试副本：不重复写 JD，直接补 Portfolio…"
-      : "正在写入测试副本：先更新 JD 区，再更新岗位汇总区…");
+      ? "正在恢复正式招聘文档：不重复写 JD，直接补 Portfolio…"
+      : "正在写入正式招聘文档：先更新 JD 区，再更新岗位汇总区…");
     try {
       const response = await sendFeishuWriteRequest(companyDraft);
       setWriteResult(response);
@@ -246,7 +246,7 @@ function App() {
         <div>
           <img className="brandLogo" src={zhenfundLogo} alt="ZhenFund 真格基金" />
           <h1>招聘 JD 发布助手</h1>
-          <p>选择平台，粘贴 JD，确认字段，然后填入招聘平台或飞书测试副本。</p>
+          <p>选择平台，粘贴 JD，确认字段，然后填入招聘平台或正式招聘文档。</p>
         </div>
         <div className="brandMark" aria-hidden="true">
           <Wand2 size={20} />
@@ -341,7 +341,7 @@ function App() {
           inspection={inspection}
           writing={writing}
           onAuthorize={authorizeFeishu}
-          onInspect={inspectFeishuCopy}
+          onInspect={inspectFeishuDocument}
         />
       )}
 
@@ -358,7 +358,7 @@ function App() {
           onCompanyField={updateCompanyField}
           onJobField={updateCompanyJob}
           onPlan={generateFeishuPlan}
-          onWrite={writeFeishuCopy}
+          onWrite={writeFeishuDocument}
         />
       )}
 
@@ -375,10 +375,10 @@ function FeishuAccessPanel({ authStatus, inspection, writing, onAuthorize, onIns
   const checking = authStatus === "checking" || authStatus === "authorizing";
   return (
     <section className="panel feishuAccess">
-      <div className="environmentBadge">固定目标：飞书测试副本（正式文档无写入入口）</div>
+      <div className="environmentBadge">固定目标：正式招聘文档</div>
       <div className="documentTarget">
         <div>
-          <strong>测试副本文档</strong>
+          <strong>正式招聘文档</strong>
           <span>{PRODUCTION_FEISHU_DOC_URL}</span>
         </div>
         <a className="secondary" href={PRODUCTION_FEISHU_DOC_URL} target="_blank" rel="noreferrer">
@@ -395,7 +395,7 @@ function FeishuAccessPanel({ authStatus, inspection, writing, onAuthorize, onIns
           {authorized ? "重新授权" : "授权飞书"}
         </button>
         <button className="secondary" type="button" onClick={onInspect} disabled={!authorized || writing}>
-          检查测试副本
+          检查正式招聘文档
         </button>
       </div>
       <p className="helperText">
@@ -471,8 +471,8 @@ function FeishuPreview({
         {writing
           ? "正在写入…"
           : writePlan?.mode === "resume-new-company"
-            ? "确认并恢复测试副本"
-            : "确认并写入测试副本"}
+            ? "确认并恢复正式招聘文档"
+            : "确认并写入正式招聘文档"}
       </button>
     </section>
   );

@@ -14,7 +14,7 @@ export function formatFeishuWriteStatus(result) {
     const action = result.mode === "append-jobs" ? "新岗位已追加" : "新公司已更新";
     return `写入成功：${action} JD 区和岗位汇总区。${diagnostics}`;
   }
-  const detail = result?.repairHint || result?.error || "请检查测试副本文档。";
+  const detail = result?.repairHint || result?.error || "请检查正式招聘文档。";
   const jdConfirmed = (result?.completedStages ?? []).includes("jd");
   if (result?.status === "partial" || jdConfirmed) {
     const prefix = jdConfirmed

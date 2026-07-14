@@ -43,6 +43,11 @@ describe("formatFeishuWriteStatus", () => {
       logId: ""
     })).not.toContain("诊断：");
   });
+
+  it("uses the production document in the safe fallback", () => {
+    expect(formatFeishuWriteStatus({ status: "failed" }))
+      .toContain("请检查正式招聘文档。");
+  });
 });
 
 describe("formatFeishuOperationError", () => {

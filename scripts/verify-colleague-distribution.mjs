@@ -48,8 +48,11 @@ const extensionJavaScript = (await Promise.all(
     .filter((relativePath) => relativePath.startsWith("扩展/") && relativePath.endsWith(".js"))
     .map((relativePath) => readFile(path.join(packageDir, relativePath), "utf8"))
 )).join("\n");
-if (!extensionJavaScript.includes("LlhrwSLIvilANZk1opwcQGlUnNv")) {
-  throw new Error("Packaged extension is not locked to the fixed test copy");
+if (!extensionJavaScript.includes("RTWjwVZjri4uCUk0J8wcn2K3n6d")) {
+  throw new Error("Packaged extension is not locked to the production document");
+}
+if (extensionJavaScript.includes("LlhrwSLIvilANZk1opwcQGlUnNv")) {
+  throw new Error("Packaged extension contains the retired test document");
 }
 if (extensionJavaScript.includes("APPLY_HEADING_NUMBERING")
   || extensionJavaScript.includes("FEISHU_PREPARE_HEADING_NUMBERING")) {

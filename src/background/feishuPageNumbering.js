@@ -13,7 +13,7 @@ export function createFeishuPageNumbering({ chromeApi = chrome } = {}) {
     async prepare(companyName) {
       const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id || !isProductionFeishuDocument(tab.url)) {
-        throw new FeishuPageNumberingError("当前活动标签页不是指定飞书测试副本。", "wrong-document");
+        throw new FeishuPageNumberingError("当前活动标签页不是指定正式招聘文档。", "wrong-document");
       }
       const message = {
         type: "FEISHU_PREPARE_HEADING_NUMBERING",
@@ -31,7 +31,7 @@ export function createFeishuPageNumbering({ chromeApi = chrome } = {}) {
           response = await chromeApi.tabs.sendMessage(tab.id, message);
         } catch {
           throw new FeishuPageNumberingError(
-            "无法在飞书测试副本页面启动定位脚本，请重新加载扩展并刷新页面后重试。",
+            "无法在正式招聘文档页面启动定位脚本，请重新加载扩展并刷新页面后重试。",
             "page-unavailable"
           );
         }

@@ -50,9 +50,9 @@
    3. 选择安装器输出的 `EXTENSION_DIR`。
 
 8. 在扩展管理页核对扩展已启用，且显示的 ID 恰好是 `mlhjjkclfiocgafhjdhoicghiabkeggg`。若 ID 不同或扩展报错，停止，不要继续飞书授权。
-9. 打开招聘 JD 发布助手侧栏，选择“飞书文档”，让使用者用自己的飞书账号点击“授权飞书”，再点击“检查测试副本”。测试文档固定为：
+9. 打开招聘 JD 发布助手侧栏，选择“飞书文档”，让使用者用自己的飞书账号点击“授权飞书”，再点击“检查正式招聘文档”。正式文档固定为：
 
-   <https://zhenfund.feishu.cn/wiki/LlhrwSLIvilANZk1opwcQGlUnNv?fromScene=spaceOverview>
+   <https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d>
 
    只验证读取和模板识别；没有待写入语料时不要发起文档写入。
 
@@ -64,6 +64,6 @@
 - 包内文件哈希、版本、构建提交和固定扩展 ID 已通过；
 - 原生授权助手已安装，已有 Keychain Secret 是“保留”还是“本次由使用者配置”（不得报告 Secret 内容）；
 - Chrome 或 Edge 已加载并启用扩展，页面 ID 已核对；
-- 飞书授权和测试副本检查是否由使用者完成，以及失败时的原始错误。
+- 飞书授权和正式招聘文档检查是否由使用者完成，以及失败时的原始错误。
 
 若安装中断，保留安装器错误原文。不要删除稳定目录中的 `Extension.previous`，不要重复运行写入操作，也不要自行降低安全校验。

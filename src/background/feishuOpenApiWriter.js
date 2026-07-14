@@ -38,12 +38,12 @@ async function executeWrite({ client, inspect, wait, draft }) {
       draft,
       status: "failed",
       failedStage: "preflight",
-      repairHint: "无法读取测试副本文档，请检查授权和文档访问权限。"
+      repairHint: "无法读取正式招聘文档，请检查授权和文档访问权限。"
     });
   }
 
   const plan = buildFeishuOpenApiPlan(initial, draft);
-  if (!initial.documentId) plan.errors.push("无法确定测试副本的 Docx 文档 ID。");
+  if (!initial.documentId) plan.errors.push("无法确定正式招聘文档的 Docx 文档 ID。");
   if (plan.errors.length) {
     plan.ok = false;
     return makeResult({
@@ -89,7 +89,7 @@ async function executeWrite({ client, inspect, wait, draft }) {
           completedStages,
           status: "unknown",
           failedStage: "jd-verify",
-          repairHint: "岗位 JD 写入已被 API 接受但无法回读；不要重复提交，请先人工检查测试副本。"
+          repairHint: "岗位 JD 写入已被 API 接受但无法回读；不要重复提交，请先人工检查正式招聘文档。"
         });
       }
       if (!isAmbiguousNetworkError(error)) {
@@ -106,7 +106,7 @@ async function executeWrite({ client, inspect, wait, draft }) {
           stage: "jd-write",
           error,
           status: "unknown",
-          repairHint: "岗位 JD 写入请求状态未知且无法回读；不要重复提交，请先人工检查测试副本。"
+          repairHint: "岗位 JD 写入请求状态未知且无法回读；不要重复提交，请先人工检查正式招聘文档。"
         });
       }
       const timeoutVerification = verifyJdWrite(afterJd, plan);
@@ -159,7 +159,7 @@ async function executeWrite({ client, inspect, wait, draft }) {
         completedStages,
         status: "unknown",
         failedStage: "summary-verify",
-        repairHint: "岗位 JD 已校验完成；Portfolio 写入已被 API 接受但无法回读。不要重复提交，请先人工检查测试副本。"
+        repairHint: "岗位 JD 已校验完成；Portfolio 写入已被 API 接受但无法回读。不要重复提交，请先人工检查正式招聘文档。"
       });
     }
     if (!isAmbiguousNetworkError(error)) {
@@ -176,7 +176,7 @@ async function executeWrite({ client, inspect, wait, draft }) {
         stage: "summary-write",
         error,
         status: "unknown",
-        repairHint: "Portfolio 写入请求状态未知且无法回读；不要重复提交，请先人工检查测试副本。"
+        repairHint: "Portfolio 写入请求状态未知且无法回读；不要重复提交，请先人工检查正式招聘文档。"
       });
     }
     const timeoutVerification = verifySummaryWrite(afterSummary, plan);

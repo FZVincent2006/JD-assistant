@@ -65,5 +65,8 @@ describe("colleague distribution entry", () => {
     expect(verifier).toContain("PRIVATE KEY");
     expect(verifier).toContain("SHA256SUMS.txt");
     expect(verifier).toContain("extensionJavaScript");
+    expect(verifier).toContain("RTWjwVZjri4uCUk0J8wcn2K3n6d");
+    expect(verifier).toContain("LlhrwSLIvilANZk1opwcQGlUnNv");
+    expect(verifier).toContain("contains the retired test document");
   });
 });

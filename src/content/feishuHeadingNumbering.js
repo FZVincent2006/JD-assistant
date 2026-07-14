@@ -1,8 +1,8 @@
 import { isProductionFeishuDocument } from "../lib/feishuConfig.js";
 
 const REASONS = {
-  "wrong-document": "当前活动标签页不是指定飞书测试副本。",
-  "not-editable": "飞书测试副本当前不可编辑。",
+  "wrong-document": "当前活动标签页不是指定正式招聘文档。",
+  "not-editable": "正式招聘文档当前不可编辑。",
   "heading-missing": "未找到待编号的新公司 Heading 1。",
   "heading-duplicate": "找到多个同名 Heading 1，已停止编号。",
   "already-numbered": "目标公司 Heading 1 已经存在编号，未再次执行快捷键。"
