@@ -336,6 +336,7 @@ function makeResult({
     companyName: plan?.companyName ?? String(draft.companyName ?? "").trim(),
     jobTitles: plan?.jobs?.map((job) => job.title) ?? (draft.jobs ?? []).map((job) => job.title),
     errorCode: Number.isFinite(error?.code) ? error.code : 0,
+    httpStatus: Number.isFinite(error?.status) ? error.status : 0,
     logId: typeof error?.logId === "string" ? error.logId : "",
     repairHint
   };

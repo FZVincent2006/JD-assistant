@@ -22,13 +22,44 @@ describe("formatFeishuWriteStatus", () => {
     expect(formatFeishuWriteStatus({ ok: true, status: "success", completedStages: ["jd", "summary"], mode: "new-company" }))
       .toBe("写入成功：新公司已更新 JD 区和岗位汇总区。");
     expect(formatFeishuWriteStatus({ ok: false, status: "partial", completedStages: ["jd"], failedStage: "summary-write", repairHint: "检查 Portfolio 区" }))
-      .toBe("部分完成：岗位 JD 区已确认写入；Portfolio 区未完成。检查 Portfolio 区");
+      .toBe("部分完成：岗位 JD 区已确认写入；Portfolio 区未完成。检查 Portfolio 区\n诊断：Portfolio 写入");
     expect(formatFeishuWriteStatus({ ok: false, status: "failed", failedStage: "jd-verify", repairHint: "检查岗位 JD 区" }))
-      .toBe("写入失败（岗位 JD 校验）：检查岗位 JD 区");
+      .toBe("写入失败（岗位 JD 校验）：检查岗位 JD 区\n诊断：岗位 JD 校验");
     const unknown = formatFeishuWriteStatus({ status: "unknown", failedStage: "jd-write", repairHint: "检查 JD 区" });
     expect(unknown).toContain("结果未知");
     expect(unknown).not.toContain("写入失败");
     expect(unknown).not.toContain("写入成功");
+  });
+
+  it("shows page-numbering stage and safe write diagnostics", () => {
+    expect(formatFeishuWriteStatus({
+      ok: false,
+      status: "partial",
+      failedStage: "jd-numbering-page",
+      repairHint: "当前活动标签页不是指定飞书测试副本。",
+      errorCode: 1770001,
+      httpStatus: 400,
+      logId: "safe-log"
+    })).toBe(
+      "部分完成：岗位 JD 内容已写入但尚未确认完成；Portfolio 区未写入。当前活动标签页不是指定飞书测试副本。\n" +
+      "诊断：页面自动编号｜错误码 1770001｜HTTP 400｜Log ID safe-log"
+    );
+    expect(formatFeishuWriteStatus({
+      status: "partial",
+      failedStage: "jd-numbering-verify",
+      repairHint: "未确认编号",
+      errorCode: 0,
+      httpStatus: 0,
+      logId: ""
+    })).toContain("诊断：自动编号校验");
+    expect(formatFeishuWriteStatus({
+      status: "partial",
+      failedStage: null,
+      repairHint: "检查文档",
+      errorCode: 0,
+      httpStatus: 0,
+      logId: ""
+    })).not.toContain("诊断：");
   });
 });
 

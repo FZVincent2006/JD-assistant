@@ -139,6 +139,7 @@ describe("Feishu phased OpenAPI writer", () => {
       completedStages: ["jd"],
       failedStage: "summary-write",
       errorCode: 99991672,
+      httpStatus: 403,
       logId: "log-summary"
     });
     expect(result.repairHint).toContain("Portfolio");

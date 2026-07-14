@@ -13,7 +13,9 @@
 - [x] `scripts/build-feishu-auth-helper.sh`：26 项 Swift 断言通过。
 - [x] 原生助手包含 `x86_64` 与 `arm64` 两种架构。
 - [x] `npm run build` 通过生产构建和 manifest 门禁。
-- [x] 生产 manifest 无剪贴板、debugger、飞书页面 host 或飞书 content-script match。
+- [x] 生产 manifest 无剪贴板和 debugger 权限；飞书页面权限仅为 `https://zhenfund.feishu.cn/wiki/*`，且 content script 只注入顶层页面。
+- [ ] 在真实测试副本中确认扩展生成的 `Command + Shift + 7` 能让新公司 Heading 1 出现自动编号。
+- [ ] OpenAPI 回读确认 `sequence: "auto"` 后才写入 Portfolio。
 - [x] Boss/脉脉的六组 host 和 content-script match 保留。
 
 ## Chrome 只读检查
