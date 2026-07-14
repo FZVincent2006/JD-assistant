@@ -167,37 +167,9 @@ textarea {
   text-align: center;
 }
 
-.documentTarget {
-  align-items: center;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.documentTarget > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.documentTarget strong,
-.inspectionSummary strong,
 .planCard strong {
   color: #5f452f;
   font-size: 12px;
-}
-
-.documentTarget span {
-  color: #8b7967;
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.documentTarget .secondary {
-  text-decoration: none;
-  white-space: nowrap;
 }
 
 .authState {
@@ -217,10 +189,14 @@ textarea {
   color: #38683e;
 }
 
-.actionGrid {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+.authState .inlineAction {
+  background: transparent;
+  border: 0;
+  color: currentColor;
+  font-size: 11px;
+  margin-left: auto;
+  padding: 0;
+  text-decoration: underline;
 }
 
 .helperText {
@@ -230,18 +206,17 @@ textarea {
   margin: 0;
 }
 
-.inspectionSummary {
-  background: #f7f1e8;
-  border-radius: 6px;
-  display: grid;
-  gap: 4px;
-  padding: 9px 10px;
-}
-
-.inspectionSummary span,
 .planCard span {
   color: #7d6c59;
   font-size: 11px;
+}
+
+.manualDocumentCheck {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .planCard,

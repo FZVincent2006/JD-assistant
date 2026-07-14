@@ -7,7 +7,6 @@ import { parseJd } from "../lib/jdParser.js";
 import {
   collectClickRecording,
   sendDiagnosticRequest,
-  sendFeishuInspectRequest,
   sendFeishuRuntimeRequest,
   sendFeishuWriteRequest,
   sendFillRequest,
@@ -18,6 +17,7 @@ import {
   describeFeishuPlan,
   formatFeishuOperationError,
   formatFeishuWriteStatus,
+  shouldOfferFeishuDocumentCheck,
   updateJobDraftField
 } from "./feishuUi.js";
 import zhenfundLogo from "./assets/zhenfund-logo.png";
@@ -179,20 +179,7 @@ function App() {
     setInspection(null);
     setWritePlan(null);
     setWriteResult(null);
-    setStatus("飞书授权成功，可以检查正式招聘文档。");
-  }
-
-  async function inspectFeishuDocument() {
-    setStatus("正在通过 OpenAPI 检查正式招聘文档，请稍候…");
-    const response = await sendFeishuInspectRequest();
-    if (!response?.ok) {
-      setStatus(formatFeishuOperationError(response, "正式招聘文档检查失败。"));
-      return;
-    }
-    setInspection(response.inspection);
-    setWritePlan(null);
-    setWriteResult(null);
-    setStatus(`正式招聘文档检查完成：版本 ${response.inspection.revisionId}，Portfolio ${response.inspection.portfolioCompanyCount} 家，岗位 JD ${response.inspection.jdCompanyCount} 家。`);
+    setStatus("飞书授权成功，请粘贴并解析公司与岗位语料。");
   }
 
   async function generateFeishuPlan() {
@@ -200,7 +187,7 @@ function App() {
       setStatus("请先修正预览中的必填项。");
       return;
     }
-    setStatus("正在读取最新文档并生成块级写入计划…");
+    setStatus("正在检查正式招聘文档并生成块级写入计划…");
     const response = await sendFeishuRuntimeRequest("FEISHU_PLAN", companyDraft);
     if (!response?.ok) {
       setWritePlan(null);
@@ -218,7 +205,7 @@ function App() {
 
   async function writeFeishuDocument() {
     if (!companyDraft || !feishuReady) {
-      setStatus("请先完成授权、检查并生成与当前文档版本一致的有效计划。");
+      setStatus("请先完成授权，并生成与当前文档版本一致的有效计划。");
       return;
     }
     const planDescription = describeFeishuPlan(writePlan);
@@ -338,10 +325,8 @@ function App() {
       {platform === "feishu" && (
         <FeishuAccessPanel
           authStatus={authStatus}
-          inspection={inspection}
           writing={writing}
           onAuthorize={authorizeFeishu}
-          onInspect={inspectFeishuDocument}
         />
       )}
 
@@ -370,43 +355,27 @@ function App() {
   );
 }
 
-function FeishuAccessPanel({ authStatus, inspection, writing, onAuthorize, onInspect }) {
+function FeishuAccessPanel({ authStatus, writing, onAuthorize }) {
   const authorized = authStatus === "authorized";
   const checking = authStatus === "checking" || authStatus === "authorizing";
   return (
     <section className="panel feishuAccess">
       <div className="environmentBadge">固定目标：正式招聘文档</div>
-      <div className="documentTarget">
-        <div>
-          <strong>正式招聘文档</strong>
-          <span>{PRODUCTION_FEISHU_DOC_URL}</span>
-        </div>
-        <a className="secondary" href={PRODUCTION_FEISHU_DOC_URL} target="_blank" rel="noreferrer">
-          <ExternalLink size={15} />
-          打开文档检查
-        </a>
-      </div>
       <div className={`authState ${authorized ? "authorized" : ""}`}>
         <KeyRound size={16} />
         <span>{authStatusLabel(authStatus)}</span>
+        {authorized && (
+          <button className="inlineAction" type="button" onClick={onAuthorize} disabled={checking || writing}>
+            重新授权
+          </button>
+        )}
       </div>
-      <div className="actionGrid">
+      {!authorized && (
         <button className="secondary" type="button" onClick={onAuthorize} disabled={checking || writing}>
-          {authorized ? "重新授权" : "授权飞书"}
+          {authStatus === "expired" ? "重新授权" : "授权飞书"}
         </button>
-        <button className="secondary" type="button" onClick={onInspect} disabled={!authorized || writing}>
-          检查正式招聘文档
-        </button>
-      </div>
-      <p className="helperText">
-        公司名称会写成根级一级标题；如需“1.”自动序号，请在写入成功后到飞书中手动设置。无需开启 macOS 辅助功能权限。
-      </p>
-      {inspection && (
-        <div className="inspectionSummary">
-          <strong>文档版本 {inspection.revisionId}</strong>
-          <span>Portfolio {inspection.portfolioCompanyCount} 家 · 岗位 JD {inspection.jdCompanyCount} 家</span>
-        </div>
       )}
+      <p className="helperText">生成写入计划时会自动检查正式文档、权限、模板和重复岗位。</p>
     </section>
   );
 }
@@ -463,8 +432,14 @@ function FeishuPreview({
         </div>
       )}
       {writeResult && <div className={`writeResult ${writeResult.status ?? "failed"}`}>{formatFeishuWriteStatus(writeResult)}</div>}
+      {shouldOfferFeishuDocumentCheck(writeResult) && (
+        <a className="secondary manualDocumentCheck" href={PRODUCTION_FEISHU_DOC_URL} target="_blank" rel="noreferrer">
+          <ExternalLink size={15} />
+          打开正式文档检查
+        </a>
+      )}
       <button className="secondary" type="button" onClick={onPlan} disabled={!canPlan || writing || errors.length > 0}>
-        生成写入计划
+        检查并生成写入计划
       </button>
       <button className="primary" type="button" onClick={onWrite} disabled={!canWrite}>
         <Send size={16} />
