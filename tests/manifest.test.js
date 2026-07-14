@@ -3,6 +3,10 @@ import manifest from "../public/manifest.json";
 import { applyFeishuAuthMode } from "../src/lib/manifestAuthMode.js";
 
 describe("extension manifest", () => {
+  it("identifies the production-document release version", () => {
+    expect(manifest.version).toBe("0.2.1");
+  });
+
   it("uses Feishu API permissions without injecting a script into Feishu pages", () => {
     const approvedFeishuHosts = [
       "https://accounts.feishu.cn/*",

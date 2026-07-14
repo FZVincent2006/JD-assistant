@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "招聘 JD 发布助手",
   "description": "解析招聘 JD，自动填入 Boss、脉脉或指定飞书招聘测试文档，并在写入前保留人工确认。",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwrnYV00Hx+z6+Y6aukZ8+bHkE2w5Ew1QPdqE3Kj8b9ol7IKnDilAuat7KcCCwcbgPPWYyQ0Sa7hwRzP6KDmi2WzkpdUskYzxiuCGkMaHhKfFIttuiivqqaNLcNy0Tw7H1r6M71nnH/UWlyJ/r6zoETCAgOMPLjK2hUq0X2Q5Yco6wXVq4g4X46343WZrbVSoZtr7IThA+xdfAYK6sf6jGP3aAhhr8nCJ0ykFS3l89odSNimhHU1RFsDV1vWyJAuaMDNgI0uLSezETd7zieRUuCMiRd2n03UZ05Mf/BvOMMv/okwI+u9taNoXLQrvCbDfVzKm1YoAX5YFaSeP3rYywwIDAQAB",
   "permissions": ["activeTab", "identity", "scripting", "sidePanel", "storage", "tabs", "webNavigation"],
   "host_permissions": [
