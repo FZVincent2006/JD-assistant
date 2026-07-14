@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 
 const content = await readFile(new URL("../dist/content.js", import.meta.url), "utf8");
-if (/^\s*import\b/m.test(content)) {
-  throw new Error("dist/content.js contains an ES module import and cannot run as a manifest content script");
+if (/^\s*(?:import|export)\b/m.test(content)) {
+  throw new Error("dist/content.js contains ES module syntax and cannot run as a manifest content script");
 }
 
 const manifest = JSON.parse(await readFile(new URL("../dist/manifest.json", import.meta.url), "utf8"));
@@ -15,12 +15,21 @@ for (const required of ["identity", "storage"]) {
   if (!permissions.has(required)) throw new Error(`dist manifest is missing permission: ${required}`);
 }
 
-const hostPermissions = new Set(manifest.host_permissions ?? []);
-for (const required of ["https://accounts.feishu.cn/*", "https://open.feishu.cn/*"]) {
+const feishuPageMatch = "https://zhenfund.feishu.cn/wiki/*";
+const approvedFeishuHosts = [
+  "https://accounts.feishu.cn/*",
+  "https://open.feishu.cn/*",
+  feishuPageMatch
+];
+const hostPermissionValues = manifest.host_permissions ?? [];
+const hostPermissions = new Set(hostPermissionValues);
+for (const required of approvedFeishuHosts) {
   if (!hostPermissions.has(required)) throw new Error(`dist manifest is missing host permission: ${required}`);
 }
-if (hostPermissions.has("https://zhenfund.feishu.cn/*")) {
-  throw new Error("dist manifest must not request Feishu page access");
+const feishuHosts = hostPermissionValues.filter((host) => host.includes("feishu.cn"));
+if (feishuHosts.length !== approvedFeishuHosts.length
+  || feishuHosts.some((host) => !approvedFeishuHosts.includes(host))) {
+  throw new Error("dist manifest contains an unapproved or duplicate Feishu host permission");
 }
 
 const recruitingMatches = [
@@ -31,14 +40,26 @@ const recruitingMatches = [
   "https://maimai.com/*",
   "https://*.maimai.com/*"
 ];
-const contentMatches = new Set((manifest.content_scripts ?? []).flatMap((script) => script.matches ?? []));
+const contentScripts = manifest.content_scripts ?? [];
+const contentMatches = new Set(contentScripts.flatMap((script) => script.matches ?? []));
 for (const required of recruitingMatches) {
   if (!hostPermissions.has(required) || !contentMatches.has(required)) {
     throw new Error(`dist manifest lost a recruiting page match: ${required}`);
   }
 }
-if ([...contentMatches].some((match) => match.includes("feishu.cn"))) {
-  throw new Error("dist manifest must not inject a content script into Feishu");
+const feishuEntries = contentScripts.filter((script) =>
+  (script.matches ?? []).some((match) => match.includes("feishu.cn")));
+if (feishuEntries.length !== 1) {
+  throw new Error("dist manifest must contain exactly one Feishu content-script entry");
+}
+const [feishuEntry] = feishuEntries;
+if (feishuEntry.matches?.length !== 1
+  || feishuEntry.matches[0] !== feishuPageMatch
+  || feishuEntry.js?.length !== 1
+  || feishuEntry.js[0] !== "content.js"
+  || feishuEntry.run_at !== "document_idle"
+  || feishuEntry.all_frames !== false) {
+  throw new Error("dist manifest Feishu content-script entry is broader than the approved top-frame test copy");
 }
 
 for (const messageType of [
