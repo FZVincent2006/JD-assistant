@@ -18,6 +18,11 @@ const candidateMail = {
   receivedTime: "2026-07-18T09:00:00+08:00",
   hasAttachment: true
 };
+const baselineSeedMail = {
+  ...candidateMail,
+  conversationId: "baseline-seed",
+  receivedTime: "2026-07-18T08:00:00+08:00"
+};
 
 describe("hashMailVersion", () => {
   it("is stable for a scan refresh but changes for a new message version", async () => {
@@ -67,6 +72,18 @@ describe("isExcludedPlatformMail", () => {
 });
 
 describe("planScan", () => {
+  it("does not complete the baseline while the Outlook list is still empty", async () => {
+    const plan = await planScan({
+      ...emptyMonitorState(),
+      notificationCutoffAt: now
+    }, [], now, webcrypto);
+
+    expect(plan.notifications).toEqual([]);
+    expect(plan.nextState.baselineComplete).toBe(false);
+    expect(plan.nextState.baselineAt).toBeNull();
+    expect(plan.nextState.notificationCutoffAt).toBe(now);
+  });
+
   it("establishes a first baseline without notifying historical mail", async () => {
     const plan = await planScan(emptyMonitorState(), [candidateMail], now, webcrypto);
     const [entry] = Object.values(plan.nextState.seen);
@@ -84,8 +101,64 @@ describe("planScan", () => {
     expect(JSON.stringify(plan.nextState)).not.toContain(candidateMail.senderEmail);
   });
 
+  it("never alerts a historical row that Outlook renders after the baseline", async () => {
+    const cutoffAt = Date.parse("2026-07-18T10:00:00+08:00");
+    const initial = await planScan({
+      ...emptyMonitorState(),
+      notificationCutoffAt: cutoffAt
+    }, [candidateMail], cutoffAt, webcrypto);
+    const lateRenderedHistoricalMail = {
+      ...candidateMail,
+      conversationId: "late-rendered-history",
+      receivedTime: "收到 2026/7/17 09:30"
+    };
+
+    const later = await planScan(
+      initial.nextState,
+      [lateRenderedHistoricalMail],
+      cutoffAt + 60_000,
+      webcrypto
+    );
+
+    expect(later.notifications).toEqual([]);
+    expect(Object.values(later.nextState.seen)).toContainEqual(expect.objectContaining({
+      receivedTime: lateRenderedHistoricalMail.receivedTime,
+      status: "baseline"
+    }));
+  });
+
+  it("still alerts mail received after the activation cutoff", async () => {
+    const cutoffAt = Date.parse("2026-07-18T10:00:00+08:00");
+    const initial = await planScan({
+      ...emptyMonitorState(),
+      notificationCutoffAt: cutoffAt
+    }, [candidateMail], cutoffAt, webcrypto);
+    const newMail = {
+      ...candidateMail,
+      conversationId: "new-after-cutoff",
+      receivedTime: "2026-07-18T10:01:00+08:00"
+    };
+
+    const later = await planScan(
+      initial.nextState,
+      [newMail],
+      cutoffAt + 60_000,
+      webcrypto
+    );
+
+    expect(later.notifications).toEqual([{
+      ...newMail,
+      dedupeKey: expect.stringMatching(/^[a-f0-9]{64}$/)
+    }]);
+  });
+
   it("returns unseen personal mail once and records it as pending", async () => {
-    const baseline = await planScan(emptyMonitorState(), [], now - 60_000, webcrypto);
+    const baseline = await planScan(
+      emptyMonitorState(),
+      [baselineSeedMail],
+      now - 60_000,
+      webcrypto
+    );
     const first = await planScan(baseline.nextState, [candidateMail], now, webcrypto);
     const repeat = await planScan(first.nextState, [candidateMail], now + 1_000, webcrypto);
 
@@ -93,12 +166,19 @@ describe("planScan", () => {
       ...candidateMail,
       dedupeKey: expect.stringMatching(/^[a-f0-9]{64}$/)
     }]);
-    expect(Object.values(first.nextState.seen)[0].status).toBe("pending");
+    expect(Object.values(first.nextState.seen)
+      .find((entry) => entry.receivedTime === candidateMail.receivedTime)?.status)
+      .toBe("pending");
     expect(repeat.notifications).toEqual([]);
   });
 
   it("records newly observed platform mail without notifying", async () => {
-    const baseline = await planScan(emptyMonitorState(), [], now - 60_000, webcrypto);
+    const baseline = await planScan(
+      emptyMonitorState(),
+      [baselineSeedMail],
+      now - 60_000,
+      webcrypto
+    );
     const platformMail = {
       ...candidateMail,
       conversationId: "platform",
@@ -108,7 +188,8 @@ describe("planScan", () => {
     const plan = await planScan(baseline.nextState, [platformMail], now, webcrypto);
 
     expect(plan.notifications).toEqual([]);
-    expect(Object.values(plan.nextState.seen)[0]).toMatchObject({
+    expect(Object.values(plan.nextState.seen)
+      .find((entry) => entry.classification === "platform")).toMatchObject({
       classification: "platform",
       status: "filtered"
     });
@@ -117,9 +198,15 @@ describe("planScan", () => {
 
 describe("delivery and retention transitions", () => {
   it("marks only successful keys as delivered", async () => {
-    const baseline = await planScan(emptyMonitorState(), [], now - 60_000, webcrypto);
+    const baseline = await planScan(
+      emptyMonitorState(),
+      [baselineSeedMail],
+      now - 60_000,
+      webcrypto
+    );
     const planned = await planScan(baseline.nextState, [candidateMail], now, webcrypto);
-    const [key] = Object.keys(planned.nextState.seen);
+    const key = Object.keys(planned.nextState.seen)
+      .find((candidate) => candidate !== Object.keys(baseline.nextState.seen)[0]);
     const delivered = applySuccessfulDelivery(planned.nextState, [key], now + 5_000);
 
     expect(delivered.seen[key]).toMatchObject({

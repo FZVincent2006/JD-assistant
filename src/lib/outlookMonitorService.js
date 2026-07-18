@@ -180,12 +180,20 @@ export function createOutlookMonitorService({
       return { ok: false, error: "请先确认脉脉、猎聘、实习僧和 BOSS 直聘四个平台分流规则。" };
     }
 
+    const enabledAt = now();
+    const monitorState = state.monitorState.baselineComplete
+      ? state.monitorState
+      : {
+          ...state.monitorState,
+          notificationCutoffAt: state.monitorState.notificationCutoffAt || enabledAt
+        };
     const nextState = {
       ...state,
       enabled: true,
-      status: state.monitorState.baselineComplete ? "monitoring" : "baselining"
+      monitorState,
+      status: monitorState.baselineComplete ? "monitoring" : "baselining"
     };
-    appendEvent(nextState, "monitor_enabled", now());
+    appendEvent(nextState, "monitor_enabled", enabledAt);
     await saveState(nextState);
     await handleScanAlarm();
     return { ok: true, snapshot: publicSnapshot(await loadState()) };
@@ -194,13 +202,17 @@ export function createOutlookMonitorService({
   async function rebaseline(confirmed) {
     if (!confirmed) return { ok: false, error: "重新建立基线需要再次确认。" };
     const state = await loadState();
+    const resetAt = now();
     const nextState = {
       ...state,
-      monitorState: emptyMonitorState(),
+      monitorState: {
+        ...emptyMonitorState(),
+        notificationCutoffAt: state.enabled ? resetAt : null
+      },
       queue: [],
       status: state.enabled ? "baselining" : readinessStatus(state.config)
     };
-    appendEvent(nextState, "baseline_reset", now());
+    appendEvent(nextState, "baseline_reset", resetAt);
     await saveState(nextState);
     if (state.enabled) await handleScanAlarm();
     return { ok: true, snapshot: publicSnapshot(await loadState()) };
@@ -235,7 +247,7 @@ export function createOutlookMonitorService({
       page,
       monitorState: plan.nextState,
       queue: enqueueNotifications(state.queue, plan.notifications, scanTime),
-      status: "monitoring",
+      status: plan.nextState.baselineComplete ? "monitoring" : "baselining",
       lastScanAt: scanTime,
       outlookMissingSince: null
     };
@@ -385,6 +397,7 @@ export function createOutlookMonitorService({
 }
 
 function normalizeDocument(value) {
+  const storedMonitorState = value?.monitorState || {};
   return {
     schemaVersion: 1,
     config: {
@@ -398,8 +411,11 @@ function normalizeDocument(value) {
     status: value?.status || "unconfigured",
     monitorState: {
       ...emptyMonitorState(),
-      ...(value?.monitorState || {}),
-      seen: { ...(value?.monitorState?.seen || {}) }
+      ...storedMonitorState,
+      notificationCutoffAt:
+        storedMonitorState.notificationCutoffAt ||
+        (storedMonitorState.baselineComplete ? storedMonitorState.baselineAt : null),
+      seen: { ...(storedMonitorState.seen || {}) }
     },
     queue: [...(value?.queue || [])],
     events: [...(value?.events || [])].slice(-20),

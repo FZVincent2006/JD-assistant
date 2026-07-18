@@ -22,6 +22,11 @@ const candidateMail = {
   receivedTime: "2026-07-18T09:00:00+08:00",
   hasAttachment: true
 };
+const newCandidateMail = {
+  ...candidateMail,
+  conversationId: "new-candidate-conversation",
+  receivedTime: "2026-07-18T10:01:00+08:00"
+};
 
 function createChromeFake(scanResult = { ok: true, type: "OUTLOOK_SCAN_RESULT", page: validPage, mails: [] }) {
   const values = {};
@@ -200,6 +205,65 @@ describe("createOutlookMonitorService", () => {
       .toBe("baseline");
   });
 
+  it("stamps an activation cutoff and waits when Outlook has not rendered any rows", async () => {
+    const { chromeApi, values } = createChromeFake();
+    const sendWebhook = vi.fn().mockResolvedValue({ ok: true, code: 0, message: "success" });
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      sendWebhook
+    });
+    await configureAndTest(service);
+    sendWebhook.mockClear();
+
+    const result = await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SET_ENABLED",
+      payload: { enabled: true }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.snapshot.status).toBe("baselining");
+    expect(result.snapshot.baselineComplete).toBe(false);
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].monitorState.notificationCutoffAt)
+      .toBe(currentTime);
+    expect(sendWebhook).not.toHaveBeenCalled();
+  });
+
+  it("clears pending historical delivery jobs when rebuilding the baseline", async () => {
+    const { chromeApi, values } = createChromeFake();
+    const sendWebhook = vi.fn()
+      .mockResolvedValueOnce({ ok: true, code: 0, message: "success" })
+      .mockResolvedValue({ ok: false, code: "NETWORK", message: "offline" });
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      sendWebhook
+    });
+    await configureAndTest(service);
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SET_ENABLED",
+      payload: { enabled: true }
+    });
+    currentTime += 60_000;
+    await service.handleMessage({
+      type: "OUTLOOK_SCAN_RESULT",
+      page: validPage,
+      mails: [newCandidateMail]
+    });
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].queue).toHaveLength(1);
+
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_REBASELINE",
+      payload: { confirmed: true }
+    });
+
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].queue).toEqual([]);
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].monitorState.notificationCutoffAt)
+      .toBe(currentTime);
+  });
+
   it("marks a new mail delivered only after Feishu returns success", async () => {
     const { chromeApi, values } = createChromeFake();
     const sendWebhook = vi.fn().mockResolvedValue({ ok: true, code: 0, message: "success" });
@@ -220,7 +284,7 @@ describe("createOutlookMonitorService", () => {
     const result = await service.handleMessage({
       type: "OUTLOOK_SCAN_RESULT",
       page: validPage,
-      mails: [candidateMail],
+      mails: [newCandidateMail],
       reason: "mutation"
     });
     const stored = values[OUTLOOK_MONITOR_STORAGE_KEY];
@@ -253,7 +317,7 @@ describe("createOutlookMonitorService", () => {
     await service.handleMessage({
       type: "OUTLOOK_SCAN_RESULT",
       page: validPage,
-      mails: [candidateMail]
+      mails: [newCandidateMail]
     });
     const stored = values[OUTLOOK_MONITOR_STORAGE_KEY];
 

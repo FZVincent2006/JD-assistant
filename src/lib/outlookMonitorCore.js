@@ -21,6 +21,7 @@ export function emptyMonitorState() {
     schemaVersion: 1,
     baselineComplete: false,
     baselineAt: null,
+    notificationCutoffAt: null,
     lastScanAt: null,
     latestBoundaryKey: "",
     seen: {}
@@ -68,9 +69,13 @@ export async function planScan(
     if (nextState.seen[dedupeKey]) continue;
 
     const platform = isExcludedPlatformMail(mail);
-    const status = sourceState.baselineComplete
-      ? (platform ? "filtered" : "pending")
-      : "baseline";
+    const notifyPersonalMail = !platform && shouldNotifyAfterCutoff(
+      sourceState,
+      mail.receivedTime
+    );
+    const status = platform
+      ? "filtered"
+      : (notifyPersonalMail ? "pending" : "baseline");
     nextState.seen[dedupeKey] = {
       observedAt: now,
       receivedTime: String(mail.receivedTime || "").slice(0, 80),
@@ -78,7 +83,7 @@ export async function planScan(
       status
     };
 
-    if (sourceState.baselineComplete && !platform) {
+    if (notifyPersonalMail) {
       notifications.push({
         conversationId: String(mail.conversationId || "").slice(0, 180),
         senderName: String(mail.senderName || "").slice(0, 120),
@@ -91,7 +96,7 @@ export async function planScan(
     }
   }
 
-  if (!sourceState.baselineComplete) {
+  if (!sourceState.baselineComplete && (mails || []).length > 0) {
     nextState.baselineComplete = true;
     nextState.baselineAt = now;
   }
@@ -137,4 +142,50 @@ function normalizeRequired(value, field) {
 
 function normalizeSenderName(value) {
   return String(value || "").replace(/\s+/g, "").trim().toLowerCase();
+}
+
+function shouldNotifyAfterCutoff(state, receivedTime) {
+  const cutoffAt = Number(state?.notificationCutoffAt);
+  if (!Number.isFinite(cutoffAt) || cutoffAt <= 0) {
+    return Boolean(state?.baselineComplete);
+  }
+
+  const receivedAt = parseOutlookReceivedTime(receivedTime);
+  if (receivedAt == null) return false;
+  const cutoffMinute = Math.floor(cutoffAt / 60_000) * 60_000;
+  return receivedAt >= cutoffMinute;
+}
+
+export function parseOutlookReceivedTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}T/.test(text)) {
+    const parsed = Date.parse(text);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  const match = text.match(
+    /(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})日?(?:星期.)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/u
+  );
+  if (!match) return null;
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText = "0"] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  if (
+    month < 1 || month > 12 ||
+    day < 1 || day > 31 ||
+    hour < 0 || hour > 23 ||
+    minute < 0 || minute > 59 ||
+    second < 0 || second > 59
+  ) {
+    return null;
+  }
+
+  return Date.UTC(year, month - 1, day, hour - 8, minute, second);
 }
