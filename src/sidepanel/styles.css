@@ -88,17 +88,21 @@ textarea {
   border-radius: 8px;
   display: grid;
   gap: 4px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: 12px;
   padding: 4px;
 }
 
 .platformSwitch button {
+  align-items: center;
   background: transparent;
   border: 0;
   border-radius: 6px;
   color: #7d6c59;
   cursor: pointer;
+  display: inline-flex;
+  gap: 5px;
+  justify-content: center;
   min-height: 36px;
 }
 
@@ -440,4 +444,200 @@ textarea {
 
 .status span {
   white-space: pre-line;
+}
+
+.outlookMonitor h2,
+.outlookMonitor h3,
+.outlookMonitor p,
+.outlookMonitor dl,
+.outlookMonitor dd {
+  margin: 0;
+}
+
+.outlookMonitor h2 {
+  color: #8b5424;
+  font-size: 16px;
+}
+
+.outlookMonitor h3 {
+  color: #6b5744;
+  font-size: 13px;
+}
+
+.monitorTitleRow,
+.sectionHeading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.monitorTitleRow p {
+  color: #8b7967;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.monitorIcon {
+  align-items: center;
+  background: #efe6d8;
+  border-radius: 8px;
+  color: #8b5424;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  min-width: 38px;
+}
+
+.monitorState {
+  align-items: center;
+  background: #fff5dc;
+  border: 1px solid #e9ce86;
+  border-radius: 6px;
+  color: #75561b;
+  display: flex;
+  font-size: 12px;
+  gap: 7px;
+  line-height: 1.5;
+  padding: 9px 10px;
+}
+
+.monitorState-monitoring {
+  background: #e7f1e8;
+  border-color: #a9c9ae;
+  color: #38683e;
+}
+
+.monitorTarget dl {
+  display: grid;
+  gap: 7px;
+}
+
+.monitorTarget dl div {
+  align-items: baseline;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 54px minmax(0, 1fr);
+}
+
+.monitorTarget dt,
+.metric span {
+  color: #9a8977;
+  font-size: 11px;
+}
+
+.monitorTarget dd {
+  color: #4f3d2f;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.buttonLink {
+  text-decoration: none;
+}
+
+.checkRow {
+  align-items: flex-start;
+  background: #fffaf2;
+  border: 1px solid #dbc9aa;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  font-weight: 500;
+  gap: 8px;
+  line-height: 1.45;
+  padding: 9px;
+}
+
+.checkRow input {
+  margin: 2px 0 0;
+  width: auto;
+}
+
+.monitorChecklist {
+  gap: 8px;
+}
+
+.checklistItem {
+  align-items: center;
+  color: #8b7967;
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.checklistItem.isDone {
+  color: #38683e;
+}
+
+.checkDot {
+  align-items: center;
+  background: #ede5d9;
+  border-radius: 999px;
+  display: inline-flex;
+  height: 18px;
+  justify-content: center;
+  min-width: 18px;
+}
+
+.checklistItem.isDone .checkDot {
+  background: #dcebdc;
+}
+
+.metricGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metric {
+  background: #fffaf2;
+  border: 1px solid #e3d6c0;
+  border-radius: 6px;
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+}
+
+.metric strong {
+  color: #5f4937;
+  font-size: 12px;
+}
+
+.monitorActionGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.monitorEvents ul {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.monitorEvents li {
+  align-items: center;
+  border-bottom: 1px solid #ece2d4;
+  display: flex;
+  font-size: 11px;
+  gap: 8px;
+  justify-content: space-between;
+  padding-bottom: 7px;
+}
+
+.monitorEvents li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.monitorEvents time {
+  color: #a39381;
+  white-space: nowrap;
+}
+
+.monitorFooter {
+  margin-bottom: 12px;
 }
