@@ -76,6 +76,35 @@ describe("extractOutlookMailRows", () => {
     }]);
   });
 
+  it("extracts the field shape used by the live China Outlook mail list", () => {
+    document.body.innerHTML = `
+      <div
+        role="option"
+        data-convid="conv-live"
+        aria-label="未读，带附件，Example Candidate，Research internship application，今天 09:30，private preview"
+      >
+        <div role="group">
+          <span title="candidate@example.com">Example Candidate</span>
+          <span title="">Research internship application</span>
+          <span title="收到 2026/7/18 09:30">今天 09:30</span>
+          <span>private preview</span>
+        </div>
+      </div>
+    `;
+
+    const rows = extractOutlookMailRows(document);
+
+    expect(rows).toEqual([{
+      conversationId: "conv-live",
+      senderName: "Example Candidate",
+      senderEmail: "candidate@example.com",
+      subject: "Research internship application",
+      receivedTime: "2026/7/18 09:30",
+      hasAttachment: true
+    }]);
+    expect(JSON.stringify(rows)).not.toContain("private preview");
+  });
+
   it("drops rows without a stable conversation id, subject, or received time", () => {
     document.body.innerHTML = `
       <div role="option" data-subject="No id" data-received-time="2026-07-18"></div>
@@ -97,6 +126,18 @@ describe("getOutlookPageState", () => {
       folder: "个人投递（需提醒）",
       loggedIn: true,
       targetMailbox: true,
+      targetFolder: true
+    });
+  });
+
+  it("uses Outlook's folder-name attribute instead of icon and unread-count text", () => {
+    renderOutlook();
+    const folder = document.querySelector('[role="treeitem"]');
+    folder.setAttribute("data-folder-name", "个人投递（需提醒）");
+    folder.textContent = "个人投递（需提醒）已选择21未读";
+
+    expect(getOutlookPageState(document, OUTLOOK_URL)).toMatchObject({
+      folder: "个人投递（需提醒）",
       targetFolder: true
     });
   });

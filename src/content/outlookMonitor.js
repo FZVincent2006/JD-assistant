@@ -83,20 +83,23 @@ export function startOutlookMonitor({
 }
 
 function extractMailRow(row) {
+  const liveSender = findLiveSender(row);
+  const liveSubject = findLiveSubject(row);
+  const liveReceivedTime = findLiveReceivedTime(row);
   const conversationId = sanitize(row.getAttribute("data-convid"), 180);
   const senderName = sanitize(
     row.getAttribute("data-sender-name") || textFrom(row, [
       '[data-automationid="sender"]',
       '[data-testid="sender"]',
       '[class*="sender"]'
-    ]),
+    ]) || liveSender?.textContent,
     MAX_SENDER_LENGTH
   );
   const senderEmail = sanitize(
     row.getAttribute("data-sender-email") || attributeFrom(row, [
       '[data-automationid="sender"][data-email]',
       '[data-testid="sender"][data-email]'
-    ], "data-email"),
+    ], "data-email") || liveSender?.getAttribute("title"),
     MAX_EMAIL_LENGTH
   ).toLowerCase();
   const subject = sanitize(
@@ -104,7 +107,7 @@ function extractMailRow(row) {
       '[data-automationid="subject"]',
       '[data-testid="subject"]',
       '[class*="subject"]'
-    ]),
+    ]) || liveSubject?.textContent,
     MAX_SUBJECT_LENGTH
   );
   const timeElement = row.querySelector(
@@ -114,7 +117,8 @@ function extractMailRow(row) {
     row.getAttribute("data-received-time") ||
       timeElement?.getAttribute("datetime") ||
       timeElement?.getAttribute("title") ||
-      timeElement?.textContent,
+      timeElement?.textContent ||
+      liveReceivedTime,
     MAX_TIME_LENGTH
   );
   const attachmentValue = row.getAttribute("data-has-attachment");
@@ -158,7 +162,31 @@ function findSelectedFolder(root) {
   const selected = root.querySelector(
     '[role="treeitem"][aria-selected="true"], [role="treeitem"][data-is-selected="true"]'
   );
-  return sanitize(selected?.textContent, 120).replace(/\s+\d+\s*未读.*$/u, "").replace(/\s+已选择.*$/u, "");
+  const folderName = sanitize(selected?.getAttribute("data-folder-name"), 120);
+  if (folderName) return folderName;
+
+  const visibleText = sanitize(selected?.textContent, 120);
+  if (visibleText.includes(TARGET_FOLDER)) return TARGET_FOLDER;
+  return visibleText.replace(/\s*\d+\s*未读.*$/u, "").replace(/\s*已选择.*$/u, "");
+}
+
+function findLiveSender(row) {
+  return [...row.querySelectorAll("span[title]")]
+    .find((element) => looksLikeEmail(element.getAttribute("title")));
+}
+
+function findLiveSubject(row) {
+  const candidates = [...row.querySelectorAll('span[title=""]')]
+    .filter((element) => sanitize(directText(element), MAX_SUBJECT_LENGTH));
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function findLiveReceivedTime(row) {
+  for (const element of row.querySelectorAll("span[title]")) {
+    const receivedTime = normalizeReceivedTimeCandidate(element.getAttribute("title"));
+    if (receivedTime) return receivedTime;
+  }
+  return "";
 }
 
 function textFrom(root, selectors) {
@@ -183,6 +211,20 @@ function sanitize(value, maxLength) {
 
 function looksLikeEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || ""));
+}
+
+function normalizeReceivedTimeCandidate(value) {
+  const text = String(value || "").trim();
+  return text.match(/\d{4}年\d{1,2}月\d{1,2}日(?:星期.)?\s*\d{1,2}:\d{2}/u)?.[0] ||
+    text.match(/\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[T\s]\d{1,2}:\d{2})?/)?.[0] ||
+    "";
+}
+
+function directText(element) {
+  return [...(element?.childNodes || [])]
+    .filter((node) => node.nodeType === 3)
+    .map((node) => node.textContent)
+    .join(" ");
 }
 
 function isSupportedOutlookUrl(url) {
