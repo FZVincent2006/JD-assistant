@@ -105,6 +105,37 @@ describe("extractOutlookMailRows", () => {
     expect(JSON.stringify(rows)).not.toContain("private preview");
   });
 
+  it("finds the subject beside the received time when Outlook removes its title attribute", () => {
+    document.body.innerHTML = `
+      <div
+        role="option"
+        data-convid="conv-live-without-title"
+        aria-label="未读，Example Candidate，Research internship application，今天 09:30，private preview"
+      >
+        <div role="group">
+          <span title="candidate@example.com">Example Candidate</span>
+          <div class="message-heading">
+            <div><span>Research internship application</span></div>
+            <span title="收到 2026/7/18 09:30">今天 09:30</span>
+          </div>
+          <span>private preview</span>
+        </div>
+      </div>
+    `;
+
+    const rows = extractOutlookMailRows(document);
+
+    expect(rows).toEqual([{
+      conversationId: "conv-live-without-title",
+      senderName: "Example Candidate",
+      senderEmail: "candidate@example.com",
+      subject: "Research internship application",
+      receivedTime: "2026/7/18 09:30",
+      hasAttachment: false
+    }]);
+    expect(JSON.stringify(rows)).not.toContain("private preview");
+  });
+
   it("drops rows without a stable conversation id, subject, or received time", () => {
     document.body.innerHTML = `
       <div role="option" data-subject="No id" data-received-time="2026-07-18"></div>

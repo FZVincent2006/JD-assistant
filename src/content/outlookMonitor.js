@@ -84,8 +84,8 @@ export function startOutlookMonitor({
 
 function extractMailRow(row) {
   const liveSender = findLiveSender(row);
-  const liveSubject = findLiveSubject(row);
   const liveReceivedTime = findLiveReceivedTime(row);
+  const liveSubject = findLiveSubject(row, liveReceivedTime?.element);
   const conversationId = sanitize(row.getAttribute("data-convid"), 180);
   const senderName = sanitize(
     row.getAttribute("data-sender-name") || textFrom(row, [
@@ -118,7 +118,7 @@ function extractMailRow(row) {
       timeElement?.getAttribute("datetime") ||
       timeElement?.getAttribute("title") ||
       timeElement?.textContent ||
-      liveReceivedTime,
+      liveReceivedTime?.value,
     MAX_TIME_LENGTH
   );
   const attachmentValue = row.getAttribute("data-has-attachment");
@@ -175,18 +175,27 @@ function findLiveSender(row) {
     .find((element) => looksLikeEmail(element.getAttribute("title")));
 }
 
-function findLiveSubject(row) {
+function findLiveSubject(row, receivedTimeElement) {
   const candidates = [...row.querySelectorAll('span[title=""]')]
     .filter((element) => sanitize(directText(element), MAX_SUBJECT_LENGTH));
-  return candidates.length === 1 ? candidates[0] : null;
+  if (candidates.length === 1) return candidates[0];
+
+  const heading = receivedTimeElement?.parentElement;
+  if (!heading) return null;
+  const structuralCandidates = [...heading.querySelectorAll("span")]
+    .filter((element) => element !== receivedTimeElement)
+    .filter((element) => sanitize(directText(element), MAX_SUBJECT_LENGTH))
+    .filter((element) => !looksLikeEmail(element.getAttribute("title")))
+    .filter((element) => !normalizeReceivedTimeCandidate(element.getAttribute("title")));
+  return structuralCandidates.length === 1 ? structuralCandidates[0] : null;
 }
 
 function findLiveReceivedTime(row) {
   for (const element of row.querySelectorAll("span[title]")) {
     const receivedTime = normalizeReceivedTimeCandidate(element.getAttribute("title"));
-    if (receivedTime) return receivedTime;
+    if (receivedTime) return { element, value: receivedTime };
   }
-  return "";
+  return null;
 }
 
 function textFrom(root, selectors) {
