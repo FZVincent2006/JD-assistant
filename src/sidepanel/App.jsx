@@ -487,7 +487,12 @@ function FeishuAccessPanel({
       {authorized && (
         <details className="linkMaintenance">
           <summary>维护已有岗位链接</summary>
-          <p className="helperText">只读检查 Portfolio 岗位，并补全到对应岗位 JD 标题的跳转。</p>
+          <p className="helperText">只处理能与岗位 JD 标题唯一匹配的岗位；不确定项保持原样。</p>
+          <ol className="linkSteps">
+            <li>点击“检查岗位链接”（只读，不修改文档）</li>
+            <li>在“可安全补全”中勾选公司</li>
+            <li>点击确认按钮完成所选岗位</li>
+          </ol>
           {linkDescription && (
             <div className={jobLinkPlan.ok ? "planCard linkPlan" : "planCard invalid linkPlan"}>
               <strong>{linkDescription.title}</strong>
@@ -495,7 +500,7 @@ function FeishuAccessPanel({
               {jobLinkPlan.ok && <span>基于文档版本 {jobLinkPlan.baseRevisionId}</span>}
               {linkGroups.length > 0 && (
                 <fieldset className="linkCompanyPicker">
-                  <legend>选择要补链的公司（建议先小范围验收）</legend>
+                  <legend>可安全补全（建议先选择一家公司验收）</legend>
                   {linkGroups.map((group, index) => (
                     <label key={group.companyName} htmlFor={`job-link-company-${index}`}>
                       <input
@@ -511,7 +516,19 @@ function FeishuAccessPanel({
                       </span>
                     </label>
                   ))}
+                  <p className="helperText">勾选后，下方的确认按钮才会启用。</p>
                 </fieldset>
+              )}
+              {linkDescription.manualIssueCount > 0 && (
+                <details className="manualIssues">
+                  <summary>需人工检查 {linkDescription.manualIssueCount} 项</summary>
+                  <p>这些岗位不会被自动修改：</p>
+                  <ul>
+                    {linkDescription.issues.map((issue, index) => (
+                      <li key={`${index}-${issue}`}>{issue}</li>
+                    ))}
+                  </ul>
+                </details>
               )}
             </div>
           )}
