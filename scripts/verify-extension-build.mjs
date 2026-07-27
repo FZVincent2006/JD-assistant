@@ -16,6 +16,14 @@ for (const [name, content] of Object.entries(builtScripts)) {
 
 const manifest = JSON.parse(await readFile(new URL("manifest.json", distUrl), "utf8"));
 const background = await readFile(new URL("background.js", distUrl), "utf8");
+const allJavaScriptFiles = await listJavaScriptFiles(distUrl);
+const allJavaScript = (await Promise.all(
+  allJavaScriptFiles.map((fileUrl) => readFile(fileUrl, "utf8"))
+)).join("\n");
+const requiredFeishuAppId = "cli_aade4224b8789bef";
+if (!allJavaScript.includes(requiredFeishuAppId)) {
+  throw new Error(`dist JavaScript is missing the required public Feishu App ID: ${requiredFeishuAppId}`);
+}
 const permissions = new Set(manifest.permissions ?? []);
 for (const forbidden of ["clipboardRead", "clipboardWrite", "debugger"]) {
   if (permissions.has(forbidden)) throw new Error(`dist manifest contains forbidden permission: ${forbidden}`);
@@ -95,7 +103,7 @@ if (`${background}\n${builtScripts["content.js"]}`.includes("shortcut-rejected")
   throw new Error("dist contains the removed synthetic page-shortcut path");
 }
 
-for (const fileUrl of await listJavaScriptFiles(distUrl)) {
+for (const fileUrl of allJavaScriptFiles) {
   const content = await readFile(fileUrl, "utf8");
   if (/open-apis\/bot\/v2\/hook\/[A-Za-z0-9_-]{16,}/.test(content)) {
     throw new Error(`Built JavaScript contains an apparent hardcoded Feishu webhook: ${fileUrl.pathname}`);

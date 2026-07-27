@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  FEISHU_APP_ID,
   PRODUCTION_FEISHU_DOC_URL,
   PRODUCTION_FEISHU_WIKI_TOKEN,
   isProductionFeishuDocument
 } from "../src/lib/feishuConfig.js";
 
 describe("production Feishu document target", () => {
+  it("always includes the public Feishu app id required to start authorization", () => {
+    expect(FEISHU_APP_ID).toBe("cli_aade4224b8789bef");
+  });
+
   it("allows only the fixed production wiki document", () => {
     expect(PRODUCTION_FEISHU_DOC_URL).toBe(
       "https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d"

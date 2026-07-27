@@ -54,6 +54,7 @@ describe("colleague distribution entry", () => {
     const gitignore = read(".gitignore");
     const buildScript = read("scripts/build-colleague-distribution.sh");
     const verifier = read("scripts/verify-colleague-distribution.mjs");
+    const buildVerifier = read("scripts/verify-extension-build.mjs");
 
     expect(gitignore).toContain("release/");
     expect(buildScript).toContain("npm test");
@@ -68,5 +69,6 @@ describe("colleague distribution entry", () => {
     expect(verifier).toContain("RTWjwVZjri4uCUk0J8wcn2K3n6d");
     expect(verifier).toContain("LlhrwSLIvilANZk1opwcQGlUnNv");
     expect(verifier).toContain("contains the retired test document");
+    expect(buildVerifier).toContain("cli_aade4224b8789bef");
   });
 });
