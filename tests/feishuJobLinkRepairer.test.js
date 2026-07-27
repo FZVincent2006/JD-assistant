@@ -216,4 +216,20 @@ describe("Feishu historical Portfolio job-link repairer", () => {
     });
     expect(result.repairHint).toContain("校验");
   });
+
+  it("fails verification when a Portfolio job disappears during the update", async () => {
+    const initial = Object.assign(initialSnapshot(), { documentId: "doc-test" });
+    const after = linkedSnapshot(8);
+    after.portfolio.companies.pop();
+    const { repairer } = setup({ snapshots: [initial, after] });
+
+    const result = await repairer.write({ baseRevisionId: 7 });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      failedStage: "job-link-verify",
+      totalJobs: 2
+    });
+  });
 });

@@ -124,7 +124,9 @@ async function executeWrite({ client, inspect, wait, preview }) {
   }
 
   const verification = buildJobLinkRepairPlan(after);
-  if (!verification.ok || verification.updates.length) {
+  if (!verification.ok
+    || verification.updates.length
+    || verification.totalJobs !== plan.totalJobs) {
     return makeResult({
       plan,
       status: "failed",
