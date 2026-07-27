@@ -14,12 +14,12 @@ describe("colleague release channel", () => {
     );
     expect(value.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(value.extensionId).toBe(FIXED_ID);
-    expect(value.tag).toBe("v0.2.6-codex.1");
-    expect(value.extensionVersion).toBe("0.2.6");
+    expect(value.tag).toBe("v0.2.7-codex.1");
+    expect(value.extensionVersion).toBe("0.2.7");
     expect(value.sha256).toBe(
-      "e135702a1424f253a67a646063f5f4683d9561140a82d1de3a893daf380fe889"
+      "6558364ffd761dba68aba67571f31f72111bc00afe4881d08a422549242732d1"
     );
-    expect(value.buildCommit).toBe("224d0adb666c0db3b3f92e0dabbe272f058a579d");
+    expect(value.buildCommit).toBe("909ca8c28c3f15c47c4d78a0779dc9b2821ff9c9");
     expect(value.buildCommit).toMatch(/^[0-9a-f]{40}$/);
     expect(Object.isFrozen(value)).toBe(true);
   });
