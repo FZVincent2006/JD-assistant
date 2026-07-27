@@ -12,11 +12,13 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           index: "index.html",
-          background: "src/background.js"
+          background: "src/background.js",
+          outlook: "src/content/outlookMonitor.js"
         },
         output: {
           entryFileNames: (chunk) => {
             if (chunk.name === "background") return "background.js";
+            if (chunk.name === "outlook") return "outlook.js";
             return "assets/[name].js";
           },
           chunkFileNames: "assets/[name].js",

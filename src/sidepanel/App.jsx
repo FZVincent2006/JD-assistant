@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bug, CheckCircle2, ClipboardPaste, ExternalLink, KeyRound, Send, Wand2 } from "lucide-react";
+import { BellRing, Bug, CheckCircle2, ClipboardPaste, ExternalLink, KeyRound, Send, Wand2 } from "lucide-react";
 import { PRODUCTION_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
 import { parseCompanyJdBatch, validateCompanyDraft } from "../lib/companyJdParser.js";
 import { parseJd } from "../lib/jdParser.js";
@@ -25,6 +25,7 @@ import {
   shouldOfferFeishuDocumentCheck,
   updateJobDraftField
 } from "./feishuUi.js";
+import OutlookMonitorPanel from "./OutlookMonitorPanel.jsx";
 import zhenfundLogo from "./assets/zhenfund-logo.png";
 import "./styles.css";
 
@@ -331,9 +332,13 @@ function App() {
         <button className={platform === "feishu" ? "active" : ""} type="button" onClick={() => setPlatform("feishu")}>
           飞书文档
         </button>
+        <button className={platform === "outlook" ? "active" : ""} type="button" onClick={() => setPlatform("outlook")}>
+          <BellRing size={14} />
+          Outlook 提醒
+        </button>
       </section>
 
-      <section className="panel">
+      {platform !== "outlook" && <section className="panel">
         <label htmlFor="jd">JD 原文</label>
         <textarea
           id="jd"
@@ -346,9 +351,9 @@ function App() {
           <ClipboardPaste size={16} />
           {platform === "feishu" ? "解析公司与岗位" : "解析 JD"}
         </button>
-      </section>
+      </section>}
 
-      {platform !== "feishu" && <section className="panel fields">
+      {platform !== "feishu" && platform !== "outlook" && <section className="panel fields">
         {platform === "maimai" && (
           <Field label="公司名" value={draft.companyName} onChange={(value) => updateDraft("companyName", value)} />
         )}
@@ -433,10 +438,12 @@ function App() {
         />
       )}
 
-      <footer className="status">
+      {platform === "outlook" && <OutlookMonitorPanel />}
+
+      {platform !== "outlook" && <footer className="status">
         <CheckCircle2 size={16} />
         <span>{status}</span>
-      </footer>
+      </footer>}
     </main>
   );
 }

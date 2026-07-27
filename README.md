@@ -12,12 +12,13 @@ https://github.com/FZVincent2006/JD-assistant
 
 同事不需要安装 Node.js、Git、Swift 或 Xcode，也不需要手动下载构建产物。Codex 会按照 [CODEX_INSTALL.md](CODEX_INSTALL.md) 下载并校验固定 GitHub Release、安装本机授权助手，然后把稳定扩展目录交给 Chrome/Edge。人工只在首次安装时隐藏输入 App Secret，并在浏览器中确认加载扩展；重装默认保留 Keychain 中已有的 Secret。
 
-macOS 上的 Chrome/Edge 扩展，用于解析招聘 JD，并自动填入 Boss 直聘、脉脉，或通过飞书 OpenAPI 更新固定的正式招聘文档。
+macOS 上的 Chrome/Edge 扩展，用于解析招聘 JD，自动填入 Boss 直聘、脉脉，通过飞书 OpenAPI 更新固定的正式招聘文档，并在本机监控中国区 Outlook Recruiting 邮箱的新个人投递。
 
 - Boss/脉脉沿用原有页面填充逻辑，最后的发布按钮仍由人工点击。
 - 飞书采用“授权 → 检查 → 生成计划 → 人工确认 → 分阶段写入 → API 回读校验”的流程。
 - 飞书只允许写入正式招聘文档：<https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d>。
 - 扩展只通过飞书 OpenAPI 读写这个固定正式文档，不提供测试/正式切换，不向飞书页面注入脚本，也不会发送自动编号快捷键。
+- Outlook 提醒只在本机运行；首次建立历史基线，不读取邮件正文或附件。
 
 ## 当前能力
 
@@ -202,6 +203,26 @@ CoFANCY 可糖是一个高端角膜接触镜品牌。
 
 飞书 OpenAPI 功能不修改 `src/lib/jdParser.js` 和 `src/content/formFiller.js`。构建前会校验这两个文件的基线哈希。
 
+## Outlook 新投递提醒
+
+该功能固定监控中国区 Outlook 网页版中 `recruiting@zhenfund.com` 邮箱的
+`个人投递（需提醒）` 文件夹，并把新个人投递发送到用户配置的四人飞书群。
+扩展会排除脉脉、猎聘、实习僧和 BOSS 直聘等已有服务端规则处理的平台来源。
+
+首次配置：
+
+1. 在四人飞书群中添加“自定义机器人”，开启签名校验。
+2. 在 Chrome/Edge 中登录 <https://partner.outlook.cn/mail/>，切换到目标邮箱和文件夹。
+3. 打开扩展侧栏，选择“Outlook 提醒”。
+4. 填写机器人 Webhook 和签名密钥，确认排除规则，保存配置。
+5. 发送测试提醒；确认无误后点击“建立基线并开启监控”。
+
+首次开启只记录当前邮件作为历史基线，不发送旧邮件。之后页面变化会触发扫描，
+后台也会定期补扫。电脑休眠、浏览器关闭、Outlook 标签页关闭或登录失效时监控会暂停。
+Webhook 与签名密钥只保存在当前浏览器的本地扩展存储中；提醒只包含发件人、
+邮箱、主题、时间和是否有附件，不打开邮件、不改变已读状态、不移动邮件，
+也不读取正文或下载附件。
+
 ## JD Skill 安装
 
 仓库同时包含 `skills/jd-skill`，用于把 JD 图片、截图或 OCR 文本整理成插件可解析的模板。
@@ -222,11 +243,12 @@ npm run build
 `npm run build` 会同时验证：
 
 - Boss/脉脉受保护文件哈希不变。
-- `dist/content.js` 没有 ES module import。
+- `dist/content.js` 和 `dist/outlook.js` 没有 ES module import。
 - manifest 不含剪贴板或 `debugger` 权限，也不包含飞书页面 content script；运行时只接受固定正式招聘文档。
 - 原生构建包含 `nativeMessaging`，仅用于授权令牌交换，不参与页面定位或编号。
 - Boss/脉脉 host 和 content-script matches 完整保留。
-- 后台构建包含全部飞书授权、检查、计划和写入消息。
+- 后台构建包含全部飞书授权、检查、计划、写入、岗位链接维护和 Outlook 监控消息。
+- 构建后的 JavaScript 不包含硬编码飞书机器人 Webhook。
 
 ## 回退
 
