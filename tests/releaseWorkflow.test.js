@@ -33,6 +33,9 @@ describe("colleague release workflow", () => {
     expect(workflow).toContain("ref: ${{ inputs.tag }}");
     expect(workflow).toContain("JD-assistant-macOS-*.zip");
     expect(workflow).toContain("gh release create");
+    expect(workflow).toContain('target_commit="$(git rev-parse HEAD)"');
+    expect(workflow).toContain('--target "$target_commit"');
+    expect(workflow).not.toContain('--target "$TAG"');
     expect(workflow).toContain("--prerelease");
     expect(workflow).toContain("--clobber");
   });
