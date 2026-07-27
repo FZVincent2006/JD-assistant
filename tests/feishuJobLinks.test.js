@@ -116,19 +116,36 @@ describe("historical Portfolio job-link repair plans", () => {
     });
   });
 
-  it("preserves existing run styles while replacing a wrong target", () => {
+  it("preserves existing Feishu selection links instead of rewriting them", () => {
     const snapshot = initialSnapshot();
     const job = snapshot.portfolio.companies[0].jobs[0];
-    job.linkUrl = "https://example.com/wrong";
+    const selectionUrl = `${PRODUCTION_FEISHU_DOC_URL}#share-YvKtd8t8joNewExlyrhckYQAngb`;
+    job.linkUrl = selectionUrl;
+    job.elements[0].text_run.text_element_style = {
+      link: { url: selectionUrl }
+    };
+
+    const plan = buildJobLinkRepairPlan(snapshot);
+
+    expect(plan.ok).toBe(true);
+    expect(plan.correctLinks).toBe(1);
+    expect(plan.updates).toHaveLength(1);
+    expect(plan.updates[0].companyName).toBe("示例公司乙");
+  });
+
+  it("preserves existing run styles while adding a missing target", () => {
+    const snapshot = initialSnapshot();
+    const job = snapshot.portfolio.companies[0].jobs[0];
+    job.linkUrl = "";
     job.elements = [{
       text_run: {
         content: "示例岗位甲｜",
-        text_element_style: { bold: true, link: { url: "https://example.com/wrong" } }
+        text_element_style: { bold: true }
       }
     }, {
       text_run: {
         content: "上海｜社招",
-        text_element_style: { text_color: 2, link: { url: "https://example.com/wrong" } }
+        text_element_style: { text_color: 2 }
       }
     }];
 
@@ -157,7 +174,7 @@ describe("historical Portfolio job-link repair plans", () => {
     ]);
   });
 
-  it("rejects ambiguous jobs and non-text Portfolio elements", () => {
+  it("rejects ambiguous jobs, unsafe existing links, and non-text Portfolio elements", () => {
     const ambiguous = initialSnapshot();
     const duplicate = structuredClone(ambiguous.jd.companies[0].jobs[0]);
     duplicate.blockId = "duplicate-job-heading";
@@ -165,6 +182,27 @@ describe("historical Portfolio job-link repair plans", () => {
     const ambiguousPlan = buildJobLinkRepairPlan(ambiguous);
     expect(ambiguousPlan.ok).toBe(false);
     expect(ambiguousPlan.errors.join("；")).toContain("示例岗位甲");
+
+    const external = initialSnapshot();
+    external.portfolio.companies[0].jobs[0].linkUrl = "https://example.com/wrong";
+    external.portfolio.companies[0].jobs[0].elements[0].text_run.text_element_style = {
+      link: { url: "https://example.com/wrong" }
+    };
+    const externalPlan = buildJobLinkRepairPlan(external);
+    expect(externalPlan.ok).toBe(false);
+    expect(externalPlan.errors.join("；")).toContain("已有链接");
+    expect(externalPlan.updates.some((item) => item.blockId === "summary-job-a1")).toBe(false);
+
+    const mixed = initialSnapshot();
+    mixed.portfolio.companies[0].jobs[0].elements = [
+      { text_run: { content: "示例岗位甲｜", text_element_style: {
+        link: { url: `${PRODUCTION_FEISHU_DOC_URL}#share-one` }
+      } } },
+      { text_run: { content: "上海｜社招" } }
+    ];
+    const mixedPlan = buildJobLinkRepairPlan(mixed);
+    expect(mixedPlan.ok).toBe(false);
+    expect(mixedPlan.errors.join("；")).toContain("混合");
 
     const nonText = initialSnapshot();
     nonText.portfolio.companies[0].jobs[0].elements = [{

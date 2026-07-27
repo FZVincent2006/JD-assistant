@@ -136,6 +136,53 @@ describe("Feishu historical Portfolio job-link repairer", () => {
     expect(wait).toHaveBeenCalledWith(400);
   });
 
+  it("patches only the selected company and leaves other missing links for a later batch", async () => {
+    const initial = Object.assign(initialSnapshot(), { documentId: "doc-test" });
+    const after = initialSnapshot();
+    after.documentId = "doc-test";
+    after.revisionId = 8;
+    const target = after.jd.companies[0].jobs[0];
+    const url = `${PRODUCTION_FEISHU_DOC_URL}#${target.blockId}`;
+    after.portfolio.companies[0].jobs[0].linkUrl = url;
+    after.portfolio.companies[0].jobs[0].elements[0].text_run.text_element_style = {
+      link: { url }
+    };
+    const { repairer, request } = setup({ snapshots: [initial, after] });
+
+    const result = await repairer.write({
+      baseRevisionId: 7,
+      companyNames: ["示例公司甲"]
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "success",
+      updatedLinks: 1,
+      totalJobs: 2
+    });
+    expect(request.mock.calls[0][1].body.requests).toEqual([
+      expect.objectContaining({ block_id: "summary-job-a1" })
+    ]);
+  });
+
+  it("rejects a selected company that is not in the current preview", async () => {
+    const initial = Object.assign(initialSnapshot(), { documentId: "doc-test" });
+    const { repairer, request } = setup({ snapshots: [initial] });
+
+    const result = await repairer.write({
+      baseRevisionId: 7,
+      companyNames: ["不存在的公司"]
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      failedStage: "job-link-preflight"
+    });
+    expect(result.repairHint).toContain("重新检查");
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("does not retry an explicit API rejection", async () => {
     const initial = Object.assign(initialSnapshot(), { documentId: "doc-test" });
     const request = vi.fn().mockRejectedValue(new FeishuApiError({

@@ -82,6 +82,19 @@ export function buildJobLinkRepairPlan(snapshot = {}) {
       let elements;
       try {
         linkUrl = buildJobAnchorUrl(jdJobs[0].blockId);
+        const existingLink = inspectTextRunLinks(portfolioJob.elements);
+        if (existingLink.kind === "linked") {
+          if (existingLink.url === linkUrl || isFeishuSelectionLink(existingLink.url)) {
+            correctLinks += 1;
+            continue;
+          }
+          errors.push(`公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”已有链接但目标无法安全确认，请人工检查。`);
+          continue;
+        }
+        if (existingLink.kind === "mixed") {
+          errors.push(`公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”包含混合链接，无法安全补全。`);
+          continue;
+        }
         elements = linkTextElements(portfolioJob.elements, linkUrl);
       } catch (error) {
         const reason = error?.message === "Portfolio job contains unsupported rich text"
@@ -91,10 +104,6 @@ export function buildJobLinkRepairPlan(snapshot = {}) {
         continue;
       }
 
-      if (portfolioJob.linkUrl === linkUrl) {
-        correctLinks += 1;
-        continue;
-      }
       updates.push({
         companyName,
         jobText: String(portfolioJob.text ?? "").trim(),
@@ -117,6 +126,35 @@ export function buildJobLinkRepairPlan(snapshot = {}) {
     updates,
     errors
   };
+}
+
+function inspectTextRunLinks(elements) {
+  if (!Array.isArray(elements) || !elements.length) {
+    throw new Error("Portfolio job contains unsupported rich text");
+  }
+  const links = [];
+  for (const element of elements) {
+    if (!element?.text_run || typeof element.text_run.content !== "string") {
+      throw new Error("Portfolio job contains unsupported rich text");
+    }
+    links.push(String(element.text_run.text_element_style?.link?.url ?? "").trim());
+  }
+  const unique = new Set(links);
+  if (unique.size === 1 && unique.has("")) return { kind: "missing", url: "" };
+  if (unique.size === 1) return { kind: "linked", url: links[0] };
+  return { kind: "mixed", url: "" };
+}
+
+function isFeishuSelectionLink(linkUrl) {
+  try {
+    const candidate = new URL(linkUrl);
+    const production = new URL(PRODUCTION_FEISHU_DOC_URL);
+    return candidate.origin === production.origin
+      && candidate.pathname === production.pathname
+      && /^#share-[A-Za-z0-9_-]+$/.test(candidate.hash);
+  } catch {
+    return false;
+  }
 }
 
 function matchingCompanies(companies = [], companyName) {

@@ -4,6 +4,8 @@ import {
   canWriteFeishu,
   describeJobLinkPlan,
   describeFeishuPlan,
+  groupJobLinkUpdates,
+  countSelectedJobLinks,
   formatFeishuOperationError,
   formatJobLinkRepairStatus,
   formatFeishuWriteStatus,
@@ -160,33 +162,72 @@ describe("historical Portfolio job-link maintenance", () => {
     expect(canRepairJobLinks({
       authStatus: "authorized",
       plan: currentPlan,
+      selectedJobCount: 1,
       repairing: false
     })).toBe(true);
     expect(canRepairJobLinks({
       authStatus: "unauthorized",
       plan: currentPlan,
+      selectedJobCount: 1,
       repairing: false
     })).toBe(false);
     expect(canRepairJobLinks({
       authStatus: "authorized",
       plan: { ...currentPlan, ok: false },
+      selectedJobCount: 1,
       repairing: false
     })).toBe(false);
     expect(canRepairJobLinks({
       authStatus: "authorized",
       plan: { ...currentPlan, updateCount: 0 },
+      selectedJobCount: 0,
       repairing: false
     })).toBe(false);
     expect(canRepairJobLinks({
       authStatus: "authorized",
       plan: { ...currentPlan, baseRevisionId: undefined },
+      selectedJobCount: 1,
       repairing: false
     })).toBe(false);
     expect(canRepairJobLinks({
       authStatus: "authorized",
       plan: currentPlan,
+      selectedJobCount: 1,
       repairing: true
     })).toBe(false);
+    expect(canRepairJobLinks({
+      authStatus: "authorized",
+      plan: currentPlan,
+      selectedJobCount: 0,
+      repairing: false
+    })).toBe(false);
+  });
+
+  it("groups pending updates by company and counts only the selected companies", () => {
+    const plan = {
+      ...currentPlan,
+      updateCount: 3,
+      updates: [
+        { companyName: "CoFANCY 可糖", jobText: "品牌设计｜上海｜社招" },
+        { companyName: "CoFANCY 可糖", jobText: "销售主管｜深圳｜社招" },
+        { companyName: "闪念贝壳", jobText: "Agent 架构工程师｜深圳｜社招" }
+      ]
+    };
+
+    expect(groupJobLinkUpdates(plan)).toEqual([
+      {
+        companyName: "CoFANCY 可糖",
+        jobCount: 2,
+        jobs: ["品牌设计｜上海｜社招", "销售主管｜深圳｜社招"]
+      },
+      {
+        companyName: "闪念贝壳",
+        jobCount: 1,
+        jobs: ["Agent 架构工程师｜深圳｜社招"]
+      }
+    ]);
+    expect(countSelectedJobLinks(plan, ["CoFANCY 可糖"])).toBe(2);
+    expect(countSelectedJobLinks(plan, ["不存在"])).toBe(0);
   });
 
   it("describes pending, complete, and invalid scans without exposing targets", () => {

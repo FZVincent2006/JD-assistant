@@ -51,6 +51,8 @@ describe("production Feishu operator copy", () => {
 
     expect(app).toContain("<details");
     expect(app).toContain("维护已有岗位链接");
+    expect(app).toContain("选择要补链的公司");
+    expect(app).toContain("companyNames");
     expect(app).toContain("检查岗位链接");
     expect(app).toContain("确认补全");
     expect(app).toContain("FEISHU_JOB_LINK_PLAN");

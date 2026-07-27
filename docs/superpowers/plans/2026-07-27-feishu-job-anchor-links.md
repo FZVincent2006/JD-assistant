@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Automatically link every Portfolio job bullet to its matching JD job heading and safely backfill missing or incorrect links in the fixed production document.
+**Goal:** Automatically link every new Portfolio job bullet to its matching JD job heading and safely backfill missing links in the fixed production document without rewriting existing valid Feishu selection links.
 
 **Architecture:** A pure matching module derives canonical block-anchor URLs and immutable update plans from inspected Feishu block snapshots. The existing phased writer resolves real JD block IDs only after JD read-back, then renders and verifies linked Portfolio bullets; a separate background repair service previews and batch-patches historical bullets with revision gating and read-back verification.
 
@@ -48,7 +48,8 @@ expect(resolvePlannedJobLinks(snapshot, plan).jobs[0].linkUrl).toBe(
 );
 ```
 
-Also cover missing company, duplicate JD job, full-width separators, a correct existing link, a wrong link, and a non-text rich element.
+Also cover missing company, duplicate JD job, full-width separators, a canonical link, an existing
+same-document `#share-…` selection link, an unsafe external/mixed link, and a non-text rich element.
 
 - [ ] **Step 2: Run the focused tests and verify RED**
 
@@ -285,13 +286,14 @@ Add a collapsed `<details>` inside the authorized Feishu access panel:
 - `检查岗位链接`;
 - a concise count card;
 - a list of company/job labels scheduled for update;
-- `确认补全 N 个岗位链接`.
+- 按公司勾选待补链岗位；
+- `确认补全已选 N 个岗位链接`.
 
 Before write, show:
 
 ```js
 window.confirm(
-  `将原位更新正式招聘文档中的 ${updateCount} 个 Portfolio 岗位链接，不修改岗位 JD。确认继续？`
+  `将原位更新所选公司的 ${selectedJobCount} 个 Portfolio 岗位链接，不修改岗位 JD。确认继续？`
 )
 ```
 

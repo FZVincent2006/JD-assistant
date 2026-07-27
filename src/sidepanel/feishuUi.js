@@ -79,13 +79,41 @@ export function canWriteFeishu({ authStatus, inspection, plan, errors = [], writ
     && !writing;
 }
 
-export function canRepairJobLinks({ authStatus, plan, repairing = false }) {
+export function canRepairJobLinks({
+  authStatus,
+  plan,
+  selectedJobCount = 0,
+  repairing = false
+}) {
   return authStatus === "authorized"
     && Boolean(plan?.ok)
     && Number.isInteger(plan.baseRevisionId)
     && Number.isInteger(plan.updateCount)
     && plan.updateCount > 0
+    && Number.isInteger(selectedJobCount)
+    && selectedJobCount > 0
     && !repairing;
+}
+
+export function groupJobLinkUpdates(plan = {}) {
+  const groups = new Map();
+  for (const update of plan.updates ?? []) {
+    const companyName = String(update.companyName ?? "").trim();
+    const jobText = String(update.jobText ?? "").trim();
+    if (!companyName || !jobText) continue;
+    if (!groups.has(companyName)) {
+      groups.set(companyName, { companyName, jobCount: 0, jobs: [] });
+    }
+    const group = groups.get(companyName);
+    group.jobCount += 1;
+    group.jobs.push(jobText);
+  }
+  return [...groups.values()];
+}
+
+export function countSelectedJobLinks(plan = {}, selectedCompanyNames = []) {
+  const selected = new Set(selectedCompanyNames);
+  return (plan.updates ?? []).filter((update) => selected.has(update.companyName)).length;
 }
 
 export function describeJobLinkPlan(plan = {}) {

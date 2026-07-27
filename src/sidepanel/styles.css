@@ -232,6 +232,49 @@ textarea {
   overflow: auto;
 }
 
+.linkCompanyPicker {
+  border: 0;
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0;
+}
+
+.linkCompanyPicker legend {
+  color: #6b5744;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.linkCompanyPicker label {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #d9e5da;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  gap: 7px;
+  padding: 7px;
+}
+
+.linkCompanyPicker input {
+  margin: 2px 0 0;
+}
+
+.linkCompanyPicker span,
+.linkCompanyPicker small {
+  display: block;
+}
+
+.linkCompanyPicker small {
+  color: #7d6c59;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
 .planCard span {
   color: #7d6c59;
   font-size: 11px;

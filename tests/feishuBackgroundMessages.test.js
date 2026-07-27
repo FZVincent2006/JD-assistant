@@ -131,7 +131,10 @@ describe("Feishu service-worker messages", () => {
       current
     );
     const written = await handleFeishuBackgroundMessage(
-      { type: "FEISHU_JOB_LINK_WRITE", payload: { baseRevisionId: 7 } },
+      {
+        type: "FEISHU_JOB_LINK_WRITE",
+        payload: { baseRevisionId: 7, companyNames: ["示例公司甲"] }
+      },
       current
     );
     const serialized = JSON.stringify(planned);
@@ -155,7 +158,7 @@ describe("Feishu service-worker messages", () => {
     expect(serialized).not.toContain("private.example");
     expect(serialized).not.toContain("private-elements");
     expect(current.jobLinkRepairer.write)
-      .toHaveBeenCalledWith({ baseRevisionId: 7 });
+      .toHaveBeenCalledWith({ baseRevisionId: 7, companyNames: ["示例公司甲"] });
     expect(written).toMatchObject({ ok: true, status: "success", updatedLinks: 1 });
   });
 

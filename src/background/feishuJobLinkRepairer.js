@@ -58,6 +58,15 @@ async function executeWrite({ client, inspect, wait, preview }) {
       repairHint: plan.errors.join("；")
     });
   }
+  const selection = selectUpdates(plan, preview.companyNames);
+  if (!selection.ok) {
+    return makeResult({
+      plan,
+      status: "failed",
+      failedStage: "job-link-preflight",
+      repairHint: "所选公司已不在当前补链计划中，请重新检查岗位链接后再确认。"
+    });
+  }
   if (!initial.documentId) {
     return makeResult({
       plan,
@@ -66,7 +75,7 @@ async function executeWrite({ client, inspect, wait, preview }) {
       repairHint: "无法确定正式招聘文档的 Docx 文档 ID。"
     });
   }
-  if (!plan.updates.length) {
+  if (!selection.updates.length) {
     return makeResult({
       plan,
       ok: true,
@@ -85,7 +94,7 @@ async function executeWrite({ client, inspect, wait, preview }) {
         method: "PATCH",
         query: { document_revision_id: plan.baseRevisionId },
         body: {
-          requests: plan.updates.map(({ blockId, elements }) => ({
+          requests: selection.updates.map(({ blockId, elements }) => ({
             block_id: blockId,
             update_text_elements: { elements }
           }))
@@ -124,8 +133,10 @@ async function executeWrite({ client, inspect, wait, preview }) {
   }
 
   const verification = buildJobLinkRepairPlan(after);
+  const remaining = selectUpdates(verification, selection.companyNames, { requireAvailable: false });
   if (!verification.ok
-    || verification.updates.length
+    || !remaining.ok
+    || remaining.updates.length
     || verification.totalJobs !== plan.totalJobs) {
     return makeResult({
       plan,
@@ -141,8 +152,38 @@ async function executeWrite({ client, inspect, wait, preview }) {
     ok: true,
     status: "success",
     failedStage: null,
-    updatedLinks: plan.updates.length
+    updatedLinks: selection.updates.length
   });
+}
+
+function selectUpdates(plan, requestedCompanyNames, { requireAvailable = true } = {}) {
+  if (requestedCompanyNames === undefined) {
+    return {
+      ok: true,
+      companyNames: [...new Set((plan.updates ?? []).map((update) => update.companyName))],
+      updates: [...(plan.updates ?? [])]
+    };
+  }
+  if (!Array.isArray(requestedCompanyNames)
+    || requestedCompanyNames.length < 1
+    || requestedCompanyNames.length > 50) {
+    return { ok: false, companyNames: [], updates: [] };
+  }
+  const companyNames = [...new Set(requestedCompanyNames.map((value) => String(value ?? "").trim()))];
+  if (companyNames.length !== requestedCompanyNames.length
+    || companyNames.some((value) => !value || value.length > 80)) {
+    return { ok: false, companyNames: [], updates: [] };
+  }
+  const available = new Set((plan.updates ?? []).map((update) => update.companyName));
+  if (requireAvailable && companyNames.some((name) => !available.has(name))) {
+    return { ok: false, companyNames: [], updates: [] };
+  }
+  const selected = new Set(companyNames);
+  return {
+    ok: true,
+    companyNames,
+    updates: (plan.updates ?? []).filter((update) => selected.has(update.companyName))
+  };
 }
 
 function makeResult({

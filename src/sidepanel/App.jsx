@@ -15,11 +15,13 @@ import {
 import {
   canRepairJobLinks,
   canWriteFeishu,
+  countSelectedJobLinks,
   describeJobLinkPlan,
   describeFeishuPlan,
   formatFeishuOperationError,
   formatJobLinkRepairStatus,
   formatFeishuWriteStatus,
+  groupJobLinkUpdates,
   shouldOfferFeishuDocumentCheck,
   updateJobDraftField
 } from "./feishuUi.js";
@@ -57,14 +59,17 @@ function App() {
   const [writing, setWriting] = useState(false);
   const [jobLinkPlan, setJobLinkPlan] = useState(null);
   const [jobLinkResult, setJobLinkResult] = useState(null);
+  const [selectedJobLinkCompanies, setSelectedJobLinkCompanies] = useState([]);
   const [repairingLinks, setRepairingLinks] = useState(false);
   const keywordText = useMemo(() => draft.keywords.join("、"), [draft.keywords]);
   const feishuErrors = companyDraft ? validateCompanyDraft(companyDraft) : [];
   const feishuWarnings = companyDraft ? getFeishuWarnings(companyDraft) : [];
   const feishuReady = canWriteFeishu({ authStatus, inspection, plan: writePlan, errors: feishuErrors, writing });
+  const selectedJobLinkCount = countSelectedJobLinks(jobLinkPlan, selectedJobLinkCompanies);
   const jobLinksReady = canRepairJobLinks({
     authStatus,
     plan: jobLinkPlan,
+    selectedJobCount: selectedJobLinkCount,
     repairing: repairingLinks || writing
   });
 
@@ -192,6 +197,7 @@ function App() {
     setWriteResult(null);
     setJobLinkPlan(null);
     setJobLinkResult(null);
+    setSelectedJobLinkCompanies([]);
     setStatus("飞书授权成功，请粘贴并解析公司与岗位语料。");
   }
 
@@ -203,10 +209,12 @@ function App() {
       const response = await sendFeishuRuntimeRequest("FEISHU_JOB_LINK_PLAN");
       if (!response?.ok) {
         setJobLinkPlan(null);
+        setSelectedJobLinkCompanies([]);
         setStatus(formatFeishuOperationError(response, "岗位链接检查失败。"));
         return;
       }
       setJobLinkPlan(response.plan);
+      setSelectedJobLinkCompanies([]);
       const description = describeJobLinkPlan(response.plan);
       setStatus(response.plan.ok
         ? `${description.title}，文档版本 ${response.plan.baseRevisionId}。`
@@ -222,18 +230,20 @@ function App() {
       return;
     }
     const confirmed = window.confirm(
-      `将原位更新正式招聘文档中的 ${jobLinkPlan.updateCount} 个 Portfolio 岗位链接，不修改岗位 JD。确认继续？`
+      `将原位更新所选 ${selectedJobLinkCompanies.length} 家公司的 ${selectedJobLinkCount} 个 Portfolio 岗位链接，不修改岗位 JD。确认继续？`
     );
     if (!confirmed) return;
     setRepairingLinks(true);
     setJobLinkResult(null);
-    setStatus(`正在补全 ${jobLinkPlan.updateCount} 个 Portfolio 岗位链接…`);
+    setStatus(`正在补全 ${selectedJobLinkCount} 个 Portfolio 岗位链接…`);
     try {
       const response = await sendFeishuRuntimeRequest("FEISHU_JOB_LINK_WRITE", {
-        baseRevisionId: jobLinkPlan.baseRevisionId
+        baseRevisionId: jobLinkPlan.baseRevisionId,
+        companyNames: selectedJobLinkCompanies
       });
       setJobLinkResult(response);
       setJobLinkPlan(null);
+      setSelectedJobLinkCompanies([]);
       setStatus(formatJobLinkRepairStatus(response ?? {
         status: "unknown",
         repairHint: "岗位链接补全没有返回结果；不要重复提交。"
@@ -241,6 +251,12 @@ function App() {
     } finally {
       setRepairingLinks(false);
     }
+  }
+
+  function toggleJobLinkCompany(companyName) {
+    setSelectedJobLinkCompanies((current) => current.includes(companyName)
+      ? current.filter((name) => name !== companyName)
+      : [...current, companyName]);
   }
 
   async function generateFeishuPlan() {
@@ -390,10 +406,13 @@ function App() {
           repairingLinks={repairingLinks}
           jobLinkPlan={jobLinkPlan}
           jobLinkResult={jobLinkResult}
+          selectedCompanyNames={selectedJobLinkCompanies}
+          selectedJobCount={selectedJobLinkCount}
           canRepairJobLinks={jobLinksReady}
           onAuthorize={authorizeFeishu}
           onInspectJobLinks={inspectJobLinks}
           onRepairJobLinks={repairJobLinks}
+          onToggleJobLinkCompany={toggleJobLinkCompany}
         />
       )}
 
@@ -428,14 +447,18 @@ function FeishuAccessPanel({
   repairingLinks,
   jobLinkPlan,
   jobLinkResult,
+  selectedCompanyNames,
+  selectedJobCount,
   canRepairJobLinks: canRepair,
   onAuthorize,
   onInspectJobLinks,
-  onRepairJobLinks
+  onRepairJobLinks,
+  onToggleJobLinkCompany
 }) {
   const authorized = authStatus === "authorized";
   const checking = authStatus === "checking" || authStatus === "authorizing";
   const linkDescription = jobLinkPlan ? describeJobLinkPlan(jobLinkPlan) : null;
+  const linkGroups = groupJobLinkUpdates(jobLinkPlan);
   return (
     <section className="panel feishuAccess">
       <div className="environmentBadge">固定目标：正式招聘文档</div>
@@ -463,10 +486,25 @@ function FeishuAccessPanel({
               <strong>{linkDescription.title}</strong>
               <p>{linkDescription.detail}</p>
               {jobLinkPlan.ok && <span>基于文档版本 {jobLinkPlan.baseRevisionId}</span>}
-              {linkDescription.updates.length > 0 && (
-                <ul className="linkUpdateList">
-                  {linkDescription.updates.map((update) => <li key={update}>{update}</li>)}
-                </ul>
+              {linkGroups.length > 0 && (
+                <fieldset className="linkCompanyPicker">
+                  <legend>选择要补链的公司（建议先小范围验收）</legend>
+                  {linkGroups.map((group, index) => (
+                    <label key={group.companyName} htmlFor={`job-link-company-${index}`}>
+                      <input
+                        id={`job-link-company-${index}`}
+                        type="checkbox"
+                        checked={selectedCompanyNames.includes(group.companyName)}
+                        onChange={() => onToggleJobLinkCompany(group.companyName)}
+                        disabled={checking || writing || repairingLinks}
+                      />
+                      <span>
+                        {group.companyName}（{group.jobCount} 个）
+                        <small>{group.jobs.join("；")}</small>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
               )}
             </div>
           )}
@@ -490,7 +528,7 @@ function FeishuAccessPanel({
               onClick={onRepairJobLinks}
               disabled={!canRepair}
             >
-              确认补全 {jobLinkPlan.updateCount} 个岗位链接
+              确认补全已选 {selectedJobCount} 个岗位链接
             </button>
           )}
         </details>
