@@ -45,7 +45,9 @@ export function resolvePlannedJobLinks(snapshot = {}, plan = {}) {
 
 export function buildJobLinkRepairPlan(snapshot = {}) {
   const errors = [];
+  const issues = [];
   const updates = [];
+  const correctBlockIds = [];
   let totalJobs = 0;
   let correctLinks = 0;
   const revisionId = snapshot.revisionId;
@@ -57,7 +59,10 @@ export function buildJobLinkRepairPlan(snapshot = {}) {
     const companyName = String(portfolioCompany.name ?? "").trim();
     const jdCompanies = matchingCompanies(snapshot.jd?.companies, companyName);
     if (jdCompanies.length !== 1) {
-      errors.push(`Portfolio 公司“${companyName || "未知公司"}”无法唯一匹配岗位 JD 公司。`);
+      const message = `Portfolio 公司“${companyName || "未知公司"}”无法唯一匹配岗位 JD 公司。`;
+      for (const portfolioJob of portfolioCompany.jobs ?? []) {
+        addManualIssue(issues, companyName, portfolioJob, message);
+      }
       totalJobs += portfolioCompany.jobs?.length ?? 0;
       continue;
     }
@@ -67,14 +72,24 @@ export function buildJobLinkRepairPlan(snapshot = {}) {
       totalJobs += 1;
       const key = jobKey(portfolioJob);
       if (!key || seenPortfolioJobs.has(key)) {
-        errors.push(`公司“${companyName}”的 Portfolio 岗位“${safeJobText(portfolioJob)}”不唯一或字段不完整。`);
+        addManualIssue(
+          issues,
+          companyName,
+          portfolioJob,
+          `公司“${companyName}”的 Portfolio 岗位“${safeJobText(portfolioJob)}”不唯一或字段不完整。`
+        );
         continue;
       }
       seenPortfolioJobs.add(key);
 
       const jdJobs = matchingJobs(jdCompanies[0].jobs, portfolioJob);
       if (jdJobs.length !== 1) {
-        errors.push(`公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”无法唯一匹配岗位 JD 标题。`);
+        addManualIssue(
+          issues,
+          companyName,
+          portfolioJob,
+          `公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”无法唯一匹配岗位 JD 标题。`
+        );
         continue;
       }
 
@@ -86,13 +101,24 @@ export function buildJobLinkRepairPlan(snapshot = {}) {
         if (existingLink.kind === "linked") {
           if (existingLink.url === linkUrl || isFeishuSelectionLink(existingLink.url)) {
             correctLinks += 1;
+            correctBlockIds.push(String(portfolioJob.blockId ?? ""));
             continue;
           }
-          errors.push(`公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”已有链接但目标无法安全确认，请人工检查。`);
+          addManualIssue(
+            issues,
+            companyName,
+            portfolioJob,
+            `公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”已有链接但目标无法安全确认，请人工检查。`
+          );
           continue;
         }
         if (existingLink.kind === "mixed") {
-          errors.push(`公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”包含混合链接，无法安全补全。`);
+          addManualIssue(
+            issues,
+            companyName,
+            portfolioJob,
+            `公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”包含混合链接，无法安全补全。`
+          );
           continue;
         }
         elements = linkTextElements(portfolioJob.elements, linkUrl);
@@ -100,7 +126,12 @@ export function buildJobLinkRepairPlan(snapshot = {}) {
         const reason = error?.message === "Portfolio job contains unsupported rich text"
           ? "包含无法安全保留的富文本"
           : "缺少有效岗位标题标识";
-        errors.push(`公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”${reason}。`);
+        addManualIssue(
+          issues,
+          companyName,
+          portfolioJob,
+          `公司“${companyName}”的岗位“${safeJobText(portfolioJob)}”${reason}。`
+        );
         continue;
       }
 
@@ -123,9 +154,20 @@ export function buildJobLinkRepairPlan(snapshot = {}) {
     baseRevisionId: revisionId,
     totalJobs,
     correctLinks,
+    correctBlockIds,
     updates,
+    issues,
     errors
   };
+}
+
+function addManualIssue(issues, companyName, job, message) {
+  issues.push({
+    companyName: String(companyName ?? "").trim(),
+    jobText: safeJobText(job),
+    blockId: String(job?.blockId ?? "").trim(),
+    message
+  });
 }
 
 function inspectTextRunLinks(elements) {

@@ -26,10 +26,13 @@ describe("Feishu operator documentation", () => {
     expect(readme).toContain("维护已有岗位链接");
     expect(readme).toContain("检查岗位链接");
     expect(readme).toContain("确认补全");
-    expect(readme).toContain("首次建议只选 `CoFANCY 可糖`");
+    expect(readme).toContain("首次建议只选一家公司");
+    expect(readme).toContain("需人工检查");
+    expect(readme).toContain("不会阻止其他唯一匹配项");
+    expect(readme).toContain("不做模糊匹配，不覆盖未知链接");
     expect(readme).toContain("#share-…");
     expect(readme).toContain("文档版本已变化");
     expect(readme).toContain("不需要剪贴板、飞书页面权限或 macOS 辅助功能权限");
-    expect(readme).toContain("再次检查应显示“全部岗位链接已正确”");
+    expect(readme).toContain("只有没有待更新或人工项时才会显示“全部岗位链接已正确”");
   });
 });

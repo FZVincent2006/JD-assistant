@@ -22,6 +22,21 @@ function linkedSnapshot(revisionId = 8) {
   return snapshot;
 }
 
+function partialSnapshot({ revisionId = 7, selectedLink = "" } = {}) {
+  const snapshot = initialSnapshot();
+  snapshot.revisionId = revisionId;
+  snapshot.documentId = "doc-test";
+  snapshot.portfolio.companies[0].jobs[0].elements[0].text_run.text_element_style = {
+    link: { url: "https://example.com/legacy" }
+  };
+  if (selectedLink) {
+    snapshot.portfolio.companies[1].jobs[0].elements[0].text_run.text_element_style = {
+      link: { url: selectedLink }
+    };
+  }
+  return snapshot;
+}
+
 function setup({
   snapshots = [Object.assign(initialSnapshot(), { documentId: "doc-test" }), linkedSnapshot()],
   request = vi.fn().mockResolvedValue({})
@@ -163,6 +178,51 @@ describe("Feishu historical Portfolio job-link repairer", () => {
     expect(request.mock.calls[0][1].body.requests).toEqual([
       expect.objectContaining({ block_id: "summary-job-a1" })
     ]);
+  });
+
+  it("writes and verifies a selected safe update while unrelated manual issues remain", async () => {
+    const initial = partialSnapshot();
+    const target = initial.jd.companies[1].jobs[0];
+    const after = partialSnapshot({
+      revisionId: 8,
+      selectedLink: `${PRODUCTION_FEISHU_DOC_URL}#${target.blockId}`
+    });
+    const { repairer, request } = setup({ snapshots: [initial, after] });
+
+    const result = await repairer.write({
+      baseRevisionId: 7,
+      companyNames: ["示例公司乙"]
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "success",
+      updatedLinks: 1,
+      totalJobs: 2
+    });
+    expect(request.mock.calls[0][1].body.requests).toEqual([
+      expect.objectContaining({ block_id: "summary-job-b1" })
+    ]);
+  });
+
+  it("fails verification when a selected update becomes a manual issue instead of a correct link", async () => {
+    const initial = partialSnapshot();
+    const after = partialSnapshot({
+      revisionId: 8,
+      selectedLink: "https://example.com/wrong-target"
+    });
+    const { repairer } = setup({ snapshots: [initial, after] });
+
+    const result = await repairer.write({
+      baseRevisionId: 7,
+      companyNames: ["示例公司乙"]
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      failedStage: "job-link-verify"
+    });
   });
 
   it("rejects a selected company that is not in the current preview", async () => {

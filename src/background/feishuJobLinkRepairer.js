@@ -133,10 +133,12 @@ async function executeWrite({ client, inspect, wait, preview }) {
   }
 
   const verification = buildJobLinkRepairPlan(after);
-  const remaining = selectUpdates(verification, selection.companyNames, { requireAvailable: false });
+  const correctBlockIds = new Set(verification.correctBlockIds ?? []);
+  const selectedVerified = selection.updates.every((update) =>
+    correctBlockIds.has(update.blockId)
+  );
   if (!verification.ok
-    || !remaining.ok
-    || remaining.updates.length
+    || !selectedVerified
     || verification.totalJobs !== plan.totalJobs) {
     return makeResult({
       plan,

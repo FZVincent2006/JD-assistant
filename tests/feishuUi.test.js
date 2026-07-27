@@ -152,9 +152,11 @@ describe("historical Portfolio job-link maintenance", () => {
     totalJobs: 12,
     correctLinks: 9,
     updateCount: 3,
+    manualIssueCount: 2,
     updates: [
       { companyName: "CoFANCY 可糖", jobText: "品牌设计｜上海｜社招" }
     ],
+    issues: ["人工项 A", "人工项 B"],
     errors: []
   };
 
@@ -237,21 +239,47 @@ describe("historical Portfolio job-link maintenance", () => {
 
   it("describes pending, complete, and invalid scans without exposing targets", () => {
     expect(describeJobLinkPlan(currentPlan)).toEqual({
-      title: "发现 3 个岗位链接需要补全",
-      detail: "共检查 12 个岗位，9 个已经正确。",
-      updates: ["CoFANCY 可糖｜品牌设计｜上海｜社招"]
+      title: "可安全补全 3 个岗位链接",
+      detail: "共检查 12 个岗位，9 个已经正确，2 个需人工检查。",
+      updates: ["CoFANCY 可糖｜品牌设计｜上海｜社招"],
+      manualIssueCount: 2,
+      issues: ["人工项 A", "人工项 B"]
     });
-    expect(describeJobLinkPlan({ ...currentPlan, correctLinks: 12, updateCount: 0, updates: [] }))
+    expect(describeJobLinkPlan({
+      ...currentPlan,
+      updateCount: 0,
+      updates: [],
+      manualIssueCount: 3,
+      issues: ["人工项 A", "人工项 B", "人工项 C"]
+    })).toEqual({
+      title: "没有可安全自动补全的岗位",
+      detail: "共检查 12 个岗位，9 个已经正确，3 个需人工检查。",
+      updates: [],
+      manualIssueCount: 3,
+      issues: ["人工项 A", "人工项 B", "人工项 C"]
+    });
+    expect(describeJobLinkPlan({
+      ...currentPlan,
+      correctLinks: 12,
+      updateCount: 0,
+      updates: [],
+      manualIssueCount: 0,
+      issues: []
+    }))
       .toEqual({
         title: "全部岗位链接已正确",
         detail: "共检查 12 个岗位，无需修改正式文档。",
-        updates: []
+        updates: [],
+        manualIssueCount: 0,
+        issues: []
       });
     expect(describeJobLinkPlan({ ...currentPlan, ok: false, errors: ["岗位不唯一"] }))
       .toEqual({
         title: "岗位链接计划不可执行",
         detail: "岗位不唯一",
-        updates: []
+        updates: [],
+        manualIssueCount: 0,
+        issues: []
       });
   });
 

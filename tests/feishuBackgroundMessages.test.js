@@ -36,6 +36,13 @@ function services(overrides = {}) {
           linkUrl: "https://private.example/anchor",
           elements: [{ text_run: { content: "private-elements" } }]
         }],
+        correctBlockIds: ["private-correct-block"],
+        issues: [{
+          companyName: "示例公司乙",
+          jobText: "示例岗位乙｜深圳｜社招",
+          blockId: "private-issue-block",
+          message: "公司“示例公司乙”的岗位需要人工检查。"
+        }],
         errors: []
       }),
       write: vi.fn().mockResolvedValue({
@@ -147,16 +154,20 @@ describe("Feishu service-worker messages", () => {
         totalJobs: 2,
         correctLinks: 0,
         updateCount: 1,
+        manualIssueCount: 1,
         updates: [{
           companyName: "示例公司甲",
           jobText: "示例岗位甲｜上海｜社招"
         }],
+        issues: ["公司“示例公司乙”的岗位需要人工检查。"],
         errors: []
       }
     });
     expect(serialized).not.toContain("private-block");
     expect(serialized).not.toContain("private.example");
     expect(serialized).not.toContain("private-elements");
+    expect(serialized).not.toContain("private-correct-block");
+    expect(serialized).not.toContain("private-issue-block");
     expect(current.jobLinkRepairer.write)
       .toHaveBeenCalledWith({ baseRevisionId: 7, companyNames: ["示例公司甲"] });
     expect(written).toMatchObject({ ok: true, status: "success", updatedLinks: 1 });

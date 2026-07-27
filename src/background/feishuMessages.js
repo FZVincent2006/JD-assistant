@@ -259,10 +259,12 @@ function publicJobLinkPlan(plan = {}) {
     totalJobs: Number.isInteger(plan.totalJobs) ? plan.totalJobs : 0,
     correctLinks: Number.isInteger(plan.correctLinks) ? plan.correctLinks : 0,
     updateCount: Array.isArray(plan.updates) ? plan.updates.length : 0,
+    manualIssueCount: Array.isArray(plan.issues) ? plan.issues.length : 0,
     updates: (plan.updates ?? []).map((update) => ({
       companyName: String(update.companyName ?? ""),
       jobText: String(update.jobText ?? "")
     })),
+    issues: (plan.issues ?? []).map((issue) => String(issue?.message ?? issue)),
     errors: (plan.errors ?? []).map((error) => String(error))
   };
 }

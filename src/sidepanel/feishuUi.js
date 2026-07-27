@@ -121,22 +121,43 @@ export function describeJobLinkPlan(plan = {}) {
     return {
       title: "岗位链接计划不可执行",
       detail: (plan.errors ?? []).join("；") || "请检查正式招聘文档结构。",
-      updates: []
+      updates: [],
+      manualIssueCount: 0,
+      issues: []
+    };
+  }
+  const manualIssueCount = Number.isInteger(plan.manualIssueCount)
+    ? plan.manualIssueCount
+    : (plan.issues ?? []).length;
+  const issues = (plan.issues ?? []).map((issue) => String(issue));
+  const detail = `共检查 ${plan.totalJobs ?? 0} 个岗位，${plan.correctLinks ?? 0} 个已经正确`
+    + (manualIssueCount ? `，${manualIssueCount} 个需人工检查。` : "。");
+  if (!plan.updateCount && !manualIssueCount) {
+    return {
+      title: "全部岗位链接已正确",
+      detail: `共检查 ${plan.totalJobs ?? 0} 个岗位，无需修改正式文档。`,
+      updates: [],
+      manualIssueCount: 0,
+      issues: []
     };
   }
   if (!plan.updateCount) {
     return {
-      title: "全部岗位链接已正确",
-      detail: `共检查 ${plan.totalJobs ?? 0} 个岗位，无需修改正式文档。`,
-      updates: []
+      title: "没有可安全自动补全的岗位",
+      detail,
+      updates: [],
+      manualIssueCount,
+      issues
     };
   }
   return {
-    title: `发现 ${plan.updateCount} 个岗位链接需要补全`,
-    detail: `共检查 ${plan.totalJobs ?? 0} 个岗位，${plan.correctLinks ?? 0} 个已经正确。`,
+    title: `可安全补全 ${plan.updateCount} 个岗位链接`,
+    detail,
     updates: (plan.updates ?? []).map((update) =>
       `${update.companyName}｜${update.jobText}`
-    )
+    ),
+    manualIssueCount,
+    issues
   };
 }
 

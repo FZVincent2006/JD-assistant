@@ -35,9 +35,9 @@ describe("production Feishu operator copy", () => {
     }
   });
 
-  it("documents automatic planning checks in version 0.2.6", () => {
+  it("documents automatic planning checks in version 0.2.7", () => {
     const manifest = JSON.parse(read("public/manifest.json"));
-    expect(manifest.version).toBe("0.2.6");
+    expect(manifest.version).toBe("0.2.7");
 
     for (const path of ["README.md", "CODEX_INSTALL.md", "distribution/安装说明.md"]) {
       const text = read(path);
@@ -51,7 +51,9 @@ describe("production Feishu operator copy", () => {
 
     expect(app).toContain("<details");
     expect(app).toContain("维护已有岗位链接");
-    expect(app).toContain("选择要补链的公司");
+    expect(app).toContain("可安全补全");
+    expect(app).toContain("需人工检查");
+    expect(app).toContain("不确定项保持原样");
     expect(app).toContain("companyNames");
     expect(app).toContain("检查岗位链接");
     expect(app).toContain("确认补全");
