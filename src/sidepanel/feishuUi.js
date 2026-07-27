@@ -97,7 +97,7 @@ export function canRepairJobLinks({
 
 export function groupJobLinkUpdates(plan = {}) {
   const groups = new Map();
-  for (const update of plan.updates ?? []) {
+  for (const update of plan?.updates ?? []) {
     const companyName = String(update.companyName ?? "").trim();
     const jobText = String(update.jobText ?? "").trim();
     if (!companyName || !jobText) continue;
@@ -113,7 +113,7 @@ export function groupJobLinkUpdates(plan = {}) {
 
 export function countSelectedJobLinks(plan = {}, selectedCompanyNames = []) {
   const selected = new Set(selectedCompanyNames);
-  return (plan.updates ?? []).filter((update) => selected.has(update.companyName)).length;
+  return (plan?.updates ?? []).filter((update) => selected.has(update.companyName)).length;
 }
 
 export function describeJobLinkPlan(plan = {}) {
