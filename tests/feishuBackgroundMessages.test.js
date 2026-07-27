@@ -23,6 +23,28 @@ function services(overrides = {}) {
     },
     inspect: vi.fn().mockResolvedValue(snapshot),
     writer: { write: vi.fn().mockResolvedValue({ ok: true, status: "success", completedStages: ["jd", "summary"] }) },
+    jobLinkRepairer: {
+      plan: vi.fn().mockResolvedValue({
+        ok: true,
+        baseRevisionId: 7,
+        totalJobs: 2,
+        correctLinks: 0,
+        updates: [{
+          companyName: "示例公司甲",
+          jobText: "示例岗位甲｜上海｜社招",
+          blockId: "private-block",
+          linkUrl: "https://private.example/anchor",
+          elements: [{ text_run: { content: "private-elements" } }]
+        }],
+        errors: []
+      }),
+      write: vi.fn().mockResolvedValue({
+        ok: true,
+        status: "success",
+        updatedLinks: 1,
+        totalJobs: 2
+      })
+    },
     ...overrides
   };
 }
@@ -99,6 +121,42 @@ describe("Feishu service-worker messages", () => {
     expect(planned.plan).not.toHaveProperty("summaryTarget");
     expect(current.writer.write).toHaveBeenCalledWith(draft);
     expect(written).toMatchObject({ ok: true, status: "success" });
+  });
+
+  it("returns a safe historical link plan and delegates revision-gated repair", async () => {
+    const current = services();
+
+    const planned = await handleFeishuBackgroundMessage(
+      { type: "FEISHU_JOB_LINK_PLAN" },
+      current
+    );
+    const written = await handleFeishuBackgroundMessage(
+      { type: "FEISHU_JOB_LINK_WRITE", payload: { baseRevisionId: 7 } },
+      current
+    );
+    const serialized = JSON.stringify(planned);
+
+    expect(planned).toEqual({
+      ok: true,
+      plan: {
+        ok: true,
+        baseRevisionId: 7,
+        totalJobs: 2,
+        correctLinks: 0,
+        updateCount: 1,
+        updates: [{
+          companyName: "示例公司甲",
+          jobText: "示例岗位甲｜上海｜社招"
+        }],
+        errors: []
+      }
+    });
+    expect(serialized).not.toContain("private-block");
+    expect(serialized).not.toContain("private.example");
+    expect(serialized).not.toContain("private-elements");
+    expect(current.jobLinkRepairer.write)
+      .toHaveBeenCalledWith({ baseRevisionId: 7 });
+    expect(written).toMatchObject({ ok: true, status: "success", updatedLinks: 1 });
   });
 
   it("registers one async listener only for FEISHU messages and sanitizes failures", async () => {
