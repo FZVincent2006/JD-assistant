@@ -72,12 +72,16 @@ for (const messageType of [
   "FEISHU_PLAN",
   "FEISHU_WRITE",
   "FEISHU_CLEAR_AUTH",
-  "FEISHU_JOB_LINK_INSPECT",
-  "FEISHU_JOB_LINK_REPAIR"
+  "FEISHU_JOB_LINK_PLAN",
+  "FEISHU_JOB_LINK_WRITE"
 ]) {
   if (!background.includes(messageType)) throw new Error(`dist background is missing ${messageType}`);
 }
-for (const messageType of ["OUTLOOK_GET_STATUS", "OUTLOOK_SAVE_CONFIG", "OUTLOOK_START_MONITORING"]) {
+for (const messageType of [
+  "OUTLOOK_MONITOR_GET",
+  "OUTLOOK_MONITOR_SAVE_CONFIG",
+  "OUTLOOK_MONITOR_SET_ENABLED"
+]) {
   if (!background.includes(messageType)) throw new Error(`dist background is missing ${messageType}`);
 }
 

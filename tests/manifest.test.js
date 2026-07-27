@@ -4,7 +4,7 @@ import { applyFeishuAuthMode } from "../src/lib/manifestAuthMode.js";
 
 describe("extension manifest", () => {
   it("identifies the Portfolio job-anchor release version", () => {
-    expect(manifest.version).toBe("0.2.3");
+    expect(manifest.version).toBe("0.2.4");
   });
 
   it("uses Feishu API permissions without injecting a script into Feishu pages", () => {
