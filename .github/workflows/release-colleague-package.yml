@@ -49,7 +49,8 @@ jobs:
             exit 1
           }
           asset="${assets[0]}"
+          target_commit="$(git rev-parse HEAD)"
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --target "$TAG" --prerelease --title "$TAG"
+              --target "$target_commit" --prerelease --title "$TAG"
           gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --clobber

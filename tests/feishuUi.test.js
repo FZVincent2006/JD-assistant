@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  canRepairJobLinks,
   canWriteFeishu,
+  describeJobLinkPlan,
   describeFeishuPlan,
+  groupJobLinkUpdates,
+  countSelectedJobLinks,
   formatFeishuOperationError,
+  formatJobLinkRepairStatus,
   formatFeishuWriteStatus,
   shouldOfferFeishuDocumentCheck,
   updateJobDraftField
@@ -137,5 +142,131 @@ describe("Feishu write readiness", () => {
       position: "岗位 JD 已存在且与本次草稿完全一致；不会重复写 JD，将直接把公司插入 Portfolio 汇总首位。",
       jobs: ["（1）品牌设计｜上海｜社招"]
     });
+  });
+});
+
+describe("historical Portfolio job-link maintenance", () => {
+  const currentPlan = {
+    ok: true,
+    baseRevisionId: 48,
+    totalJobs: 12,
+    correctLinks: 9,
+    updateCount: 3,
+    updates: [
+      { companyName: "CoFANCY 可糖", jobText: "品牌设计｜上海｜社招" }
+    ],
+    errors: []
+  };
+
+  it("enables repair only for an authorized, current, non-empty safe plan", () => {
+    expect(canRepairJobLinks({
+      authStatus: "authorized",
+      plan: currentPlan,
+      selectedJobCount: 1,
+      repairing: false
+    })).toBe(true);
+    expect(canRepairJobLinks({
+      authStatus: "unauthorized",
+      plan: currentPlan,
+      selectedJobCount: 1,
+      repairing: false
+    })).toBe(false);
+    expect(canRepairJobLinks({
+      authStatus: "authorized",
+      plan: { ...currentPlan, ok: false },
+      selectedJobCount: 1,
+      repairing: false
+    })).toBe(false);
+    expect(canRepairJobLinks({
+      authStatus: "authorized",
+      plan: { ...currentPlan, updateCount: 0 },
+      selectedJobCount: 0,
+      repairing: false
+    })).toBe(false);
+    expect(canRepairJobLinks({
+      authStatus: "authorized",
+      plan: { ...currentPlan, baseRevisionId: undefined },
+      selectedJobCount: 1,
+      repairing: false
+    })).toBe(false);
+    expect(canRepairJobLinks({
+      authStatus: "authorized",
+      plan: currentPlan,
+      selectedJobCount: 1,
+      repairing: true
+    })).toBe(false);
+    expect(canRepairJobLinks({
+      authStatus: "authorized",
+      plan: currentPlan,
+      selectedJobCount: 0,
+      repairing: false
+    })).toBe(false);
+  });
+
+  it("groups pending updates by company and counts only the selected companies", () => {
+    const plan = {
+      ...currentPlan,
+      updateCount: 3,
+      updates: [
+        { companyName: "CoFANCY 可糖", jobText: "品牌设计｜上海｜社招" },
+        { companyName: "CoFANCY 可糖", jobText: "销售主管｜深圳｜社招" },
+        { companyName: "闪念贝壳", jobText: "Agent 架构工程师｜深圳｜社招" }
+      ]
+    };
+
+    expect(groupJobLinkUpdates(plan)).toEqual([
+      {
+        companyName: "CoFANCY 可糖",
+        jobCount: 2,
+        jobs: ["品牌设计｜上海｜社招", "销售主管｜深圳｜社招"]
+      },
+      {
+        companyName: "闪念贝壳",
+        jobCount: 1,
+        jobs: ["Agent 架构工程师｜深圳｜社招"]
+      }
+    ]);
+    expect(countSelectedJobLinks(plan, ["CoFANCY 可糖"])).toBe(2);
+    expect(countSelectedJobLinks(plan, ["不存在"])).toBe(0);
+  });
+
+  it("describes pending, complete, and invalid scans without exposing targets", () => {
+    expect(describeJobLinkPlan(currentPlan)).toEqual({
+      title: "发现 3 个岗位链接需要补全",
+      detail: "共检查 12 个岗位，9 个已经正确。",
+      updates: ["CoFANCY 可糖｜品牌设计｜上海｜社招"]
+    });
+    expect(describeJobLinkPlan({ ...currentPlan, correctLinks: 12, updateCount: 0, updates: [] }))
+      .toEqual({
+        title: "全部岗位链接已正确",
+        detail: "共检查 12 个岗位，无需修改正式文档。",
+        updates: []
+      });
+    expect(describeJobLinkPlan({ ...currentPlan, ok: false, errors: ["岗位不唯一"] }))
+      .toEqual({
+        title: "岗位链接计划不可执行",
+        detail: "岗位不唯一",
+        updates: []
+      });
+  });
+
+  it("formats successful, failed, and unknown repair outcomes without overclaiming", () => {
+    expect(formatJobLinkRepairStatus({
+      ok: true,
+      status: "success",
+      updatedLinks: 3,
+      totalJobs: 12
+    })).toBe("岗位链接补全成功：已更新 3 个，共检查 12 个岗位。");
+    expect(formatJobLinkRepairStatus({
+      status: "failed",
+      failedStage: "job-link-write",
+      repairHint: "权限不足",
+      errorCode: 99991672
+    })).toBe("岗位链接补全失败：权限不足\n诊断：岗位链接写入｜错误码 99991672");
+    expect(formatJobLinkRepairStatus({
+      status: "unknown",
+      failedStage: "job-link-verify",
+      repairHint: "不要重复提交"
+    })).toBe("岗位链接结果未知：不要重复提交\n诊断：岗位链接校验");
   });
 });

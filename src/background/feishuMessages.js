@@ -3,6 +3,7 @@ import { buildFeishuOpenApiPlan } from "../lib/feishuOpenApiPlan.js";
 import { inspectRecruitingDocument } from "../lib/feishuTemplateReader.js";
 import { createFeishuApiClient } from "./feishuApiClient.js";
 import { createFeishuAuth } from "./feishuAuth.js";
+import { createFeishuJobLinkRepairer } from "./feishuJobLinkRepairer.js";
 import { createFeishuOpenApiWriter } from "./feishuOpenApiWriter.js";
 import { resolveFixedProductionDocument } from "./feishuWikiResolver.js";
 
@@ -12,6 +13,8 @@ const FEISHU_MESSAGE_TYPES = new Set([
   "FEISHU_INSPECT",
   "FEISHU_PLAN",
   "FEISHU_WRITE",
+  "FEISHU_JOB_LINK_PLAN",
+  "FEISHU_JOB_LINK_WRITE",
   "FEISHU_CLEAR_AUTH"
 ]);
 
@@ -42,12 +45,17 @@ export function createFeishuBackgroundServices({ chromeApi = chrome, fetchImpl =
     client,
     inspect
   });
-  return { auth, client, inspect, writer };
+  const jobLinkRepairer = createFeishuJobLinkRepairer({
+    client,
+    inspect
+  });
+  return { auth, client, inspect, writer, jobLinkRepairer };
 }
 
 export async function handleFeishuBackgroundMessage(message, services) {
   if (!FEISHU_MESSAGE_TYPES.has(message?.type)) throw new Error("Unsupported Feishu message");
-  if (!services?.auth || typeof services.inspect !== "function" || !services.writer) {
+  if (!services?.auth || typeof services.inspect !== "function"
+    || !services.writer || !services.jobLinkRepairer) {
     throw new Error("Feishu background services are unavailable");
   }
 
@@ -70,6 +78,13 @@ export async function handleFeishuBackgroundMessage(message, services) {
     }
     case "FEISHU_WRITE":
       return services.writer.write(message.payload ?? {});
+    case "FEISHU_JOB_LINK_PLAN":
+      return {
+        ok: true,
+        plan: publicJobLinkPlan(await services.jobLinkRepairer.plan())
+      };
+    case "FEISHU_JOB_LINK_WRITE":
+      return services.jobLinkRepairer.write(message.payload ?? {});
     default:
       throw new Error("Unsupported Feishu message");
   }
@@ -141,7 +156,10 @@ function publicErrorMessage(stage, internalMessage, reasonCode, context = {}) {
     "auth-store": "飞书授权已完成，但临时授权状态保存失败。",
     "wiki-resolve": "无法读取飞书知识库节点，请检查应用权限与文档访问权限。",
     "document-metadata": "无法读取飞书文档信息，请检查应用权限与文档状态。",
-    "document-blocks-read": "无法读取飞书文档内容，请检查应用权限与文档状态。"
+    "document-blocks-read": "无法读取飞书文档内容，请检查应用权限与文档状态。",
+    "job-link-preflight": "无法生成安全的岗位链接补全计划，文档不会被修改。",
+    "job-link-write": "岗位链接补全失败，请根据错误码检查权限或文档版本。",
+    "job-link-verify": "岗位链接补全后无法确认最终结果，请人工检查正式招聘文档。"
   };
   return messages[stage] ?? "飞书操作失败，请根据错误码检查授权、权限或文档状态。";
 }
@@ -231,5 +249,20 @@ function publicPlan(plan) {
     })),
     expected: structuredClone(plan.expected),
     errors: [...plan.errors]
+  };
+}
+
+function publicJobLinkPlan(plan = {}) {
+  return {
+    ok: Boolean(plan.ok),
+    baseRevisionId: plan.baseRevisionId,
+    totalJobs: Number.isInteger(plan.totalJobs) ? plan.totalJobs : 0,
+    correctLinks: Number.isInteger(plan.correctLinks) ? plan.correctLinks : 0,
+    updateCount: Array.isArray(plan.updates) ? plan.updates.length : 0,
+    updates: (plan.updates ?? []).map((update) => ({
+      companyName: String(update.companyName ?? ""),
+      jobText: String(update.jobText ?? "")
+    })),
+    errors: (plan.errors ?? []).map((error) => String(error))
   };
 }

@@ -53,6 +53,9 @@ describe("Feishu phased OpenAPI writer", () => {
       body: { index: values.plan.summaryTarget.index },
       stage: "summary-write"
     });
+    const summaryBody = JSON.stringify(client.request.mock.calls[1][1].body);
+    expect(summaryBody).toContain(`${PRODUCTION_FEISHU_DOC_URL}#new-job-1`);
+    expect(summaryBody).toContain(`${PRODUCTION_FEISHU_DOC_URL}#new-job-2`);
     const serializedRequests = JSON.stringify(client.request.mock.calls);
     expect(serializedRequests).not.toContain('"PATCH"');
     expect(serializedRequests).not.toContain("update_text_style");
@@ -129,7 +132,9 @@ describe("Feishu phased OpenAPI writer", () => {
       blockId: "append-job",
       blockType: 5,
       quoteBlockId: "append-quote",
-      index: plan.jdTarget.index
+      index: plan.jdTarget.index,
+      location: "上海",
+      employment: "社招"
     });
     const complete = structuredClone(afterJd);
     complete.revisionId += 1;
@@ -138,19 +143,25 @@ describe("Feishu phased OpenAPI writer", () => {
       text: "新增岗位｜上海｜社招",
       blockId: "append-summary",
       blockType: 12,
-      index: plan.summaryTarget.index
+      index: plan.summaryTarget.index,
+      location: "上海",
+      employment: "社招",
+      linkUrl: `${PRODUCTION_FEISHU_DOC_URL}#append-job`
     });
     const inspect = vi.fn()
       .mockResolvedValueOnce(current)
       .mockResolvedValueOnce(afterJd)
       .mockResolvedValueOnce(complete);
+    const request = vi.fn().mockResolvedValue({});
     const writer = createFeishuOpenApiWriter({
-      client: { request: vi.fn().mockResolvedValue({}) },
+      client: { request },
       inspect,
       wait: vi.fn().mockResolvedValue(undefined)
     });
 
     await expect(writer.write(appendDraft)).resolves.toMatchObject({ ok: true, mode: "append-jobs" });
+    expect(JSON.stringify(request.mock.calls[1][1].body))
+      .toContain(`${PRODUCTION_FEISHU_DOC_URL}#append-job`);
   });
 
   it("stops before summary when JD semantic verification fails", async () => {

@@ -109,6 +109,9 @@ function verifyPlannedSummaryJobs(jobs, plan, errors) {
     if (normalizeForMatch(persisted.text) !== normalizeForMatch(expectedText)) {
       errors.push(`岗位“${planned.title}”的 Portfolio Bullet 完整文本不正确。`);
     }
+    if (!planned.linkUrl || persisted.linkUrl !== planned.linkUrl) {
+      errors.push(`岗位“${planned.title}”的 Portfolio 跳转链接不正确。`);
+    }
     const expectedIndex = isNewCompanyMode(plan.mode)
       ? plan.summaryTarget.index + 1 + plannedIndex
       : plan.summaryTarget.index + plannedIndex;

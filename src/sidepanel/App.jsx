@@ -13,10 +13,15 @@ import {
   startClickRecording
 } from "./fillPage.js";
 import {
+  canRepairJobLinks,
   canWriteFeishu,
+  countSelectedJobLinks,
+  describeJobLinkPlan,
   describeFeishuPlan,
   formatFeishuOperationError,
+  formatJobLinkRepairStatus,
   formatFeishuWriteStatus,
+  groupJobLinkUpdates,
   shouldOfferFeishuDocumentCheck,
   updateJobDraftField
 } from "./feishuUi.js";
@@ -52,10 +57,21 @@ function App() {
   const [writePlan, setWritePlan] = useState(null);
   const [writeResult, setWriteResult] = useState(null);
   const [writing, setWriting] = useState(false);
+  const [jobLinkPlan, setJobLinkPlan] = useState(null);
+  const [jobLinkResult, setJobLinkResult] = useState(null);
+  const [selectedJobLinkCompanies, setSelectedJobLinkCompanies] = useState([]);
+  const [repairingLinks, setRepairingLinks] = useState(false);
   const keywordText = useMemo(() => draft.keywords.join("、"), [draft.keywords]);
   const feishuErrors = companyDraft ? validateCompanyDraft(companyDraft) : [];
   const feishuWarnings = companyDraft ? getFeishuWarnings(companyDraft) : [];
   const feishuReady = canWriteFeishu({ authStatus, inspection, plan: writePlan, errors: feishuErrors, writing });
+  const selectedJobLinkCount = countSelectedJobLinks(jobLinkPlan, selectedJobLinkCompanies);
+  const jobLinksReady = canRepairJobLinks({
+    authStatus,
+    plan: jobLinkPlan,
+    selectedJobCount: selectedJobLinkCount,
+    repairing: repairingLinks || writing
+  });
 
   useEffect(() => {
     if (platform !== "feishu") return undefined;
@@ -179,7 +195,68 @@ function App() {
     setInspection(null);
     setWritePlan(null);
     setWriteResult(null);
+    setJobLinkPlan(null);
+    setJobLinkResult(null);
+    setSelectedJobLinkCompanies([]);
     setStatus("飞书授权成功，请粘贴并解析公司与岗位语料。");
+  }
+
+  async function inspectJobLinks() {
+    setRepairingLinks(true);
+    setJobLinkResult(null);
+    setStatus("正在只读检查 Portfolio 岗位链接…");
+    try {
+      const response = await sendFeishuRuntimeRequest("FEISHU_JOB_LINK_PLAN");
+      if (!response?.ok) {
+        setJobLinkPlan(null);
+        setSelectedJobLinkCompanies([]);
+        setStatus(formatFeishuOperationError(response, "岗位链接检查失败。"));
+        return;
+      }
+      setJobLinkPlan(response.plan);
+      setSelectedJobLinkCompanies([]);
+      const description = describeJobLinkPlan(response.plan);
+      setStatus(response.plan.ok
+        ? `${description.title}，文档版本 ${response.plan.baseRevisionId}。`
+        : description.detail);
+    } finally {
+      setRepairingLinks(false);
+    }
+  }
+
+  async function repairJobLinks() {
+    if (!jobLinksReady) {
+      setStatus("请先检查岗位链接，并确认文档版本没有变化。");
+      return;
+    }
+    const confirmed = window.confirm(
+      `将原位更新所选 ${selectedJobLinkCompanies.length} 家公司的 ${selectedJobLinkCount} 个 Portfolio 岗位链接，不修改岗位 JD。确认继续？`
+    );
+    if (!confirmed) return;
+    setRepairingLinks(true);
+    setJobLinkResult(null);
+    setStatus(`正在补全 ${selectedJobLinkCount} 个 Portfolio 岗位链接…`);
+    try {
+      const response = await sendFeishuRuntimeRequest("FEISHU_JOB_LINK_WRITE", {
+        baseRevisionId: jobLinkPlan.baseRevisionId,
+        companyNames: selectedJobLinkCompanies
+      });
+      setJobLinkResult(response);
+      setJobLinkPlan(null);
+      setSelectedJobLinkCompanies([]);
+      setStatus(formatJobLinkRepairStatus(response ?? {
+        status: "unknown",
+        repairHint: "岗位链接补全没有返回结果；不要重复提交。"
+      }));
+    } finally {
+      setRepairingLinks(false);
+    }
+  }
+
+  function toggleJobLinkCompany(companyName) {
+    setSelectedJobLinkCompanies((current) => current.includes(companyName)
+      ? current.filter((name) => name !== companyName)
+      : [...current, companyName]);
   }
 
   async function generateFeishuPlan() {
@@ -326,7 +403,16 @@ function App() {
         <FeishuAccessPanel
           authStatus={authStatus}
           writing={writing}
+          repairingLinks={repairingLinks}
+          jobLinkPlan={jobLinkPlan}
+          jobLinkResult={jobLinkResult}
+          selectedCompanyNames={selectedJobLinkCompanies}
+          selectedJobCount={selectedJobLinkCount}
+          canRepairJobLinks={jobLinksReady}
           onAuthorize={authorizeFeishu}
+          onInspectJobLinks={inspectJobLinks}
+          onRepairJobLinks={repairJobLinks}
+          onToggleJobLinkCompany={toggleJobLinkCompany}
         />
       )}
 
@@ -355,9 +441,24 @@ function App() {
   );
 }
 
-function FeishuAccessPanel({ authStatus, writing, onAuthorize }) {
+function FeishuAccessPanel({
+  authStatus,
+  writing,
+  repairingLinks,
+  jobLinkPlan,
+  jobLinkResult,
+  selectedCompanyNames,
+  selectedJobCount,
+  canRepairJobLinks: canRepair,
+  onAuthorize,
+  onInspectJobLinks,
+  onRepairJobLinks,
+  onToggleJobLinkCompany
+}) {
   const authorized = authStatus === "authorized";
   const checking = authStatus === "checking" || authStatus === "authorizing";
+  const linkDescription = jobLinkPlan ? describeJobLinkPlan(jobLinkPlan) : null;
+  const linkGroups = groupJobLinkUpdates(jobLinkPlan);
   return (
     <section className="panel feishuAccess">
       <div className="environmentBadge">固定目标：正式招聘文档</div>
@@ -376,6 +477,62 @@ function FeishuAccessPanel({ authStatus, writing, onAuthorize }) {
         </button>
       )}
       <p className="helperText">生成写入计划时会自动检查正式文档、权限、模板和重复岗位。</p>
+      {authorized && (
+        <details className="linkMaintenance">
+          <summary>维护已有岗位链接</summary>
+          <p className="helperText">只读检查 Portfolio 岗位，并补全到对应岗位 JD 标题的跳转。</p>
+          {linkDescription && (
+            <div className={jobLinkPlan.ok ? "planCard linkPlan" : "planCard invalid linkPlan"}>
+              <strong>{linkDescription.title}</strong>
+              <p>{linkDescription.detail}</p>
+              {jobLinkPlan.ok && <span>基于文档版本 {jobLinkPlan.baseRevisionId}</span>}
+              {linkGroups.length > 0 && (
+                <fieldset className="linkCompanyPicker">
+                  <legend>选择要补链的公司（建议先小范围验收）</legend>
+                  {linkGroups.map((group, index) => (
+                    <label key={group.companyName} htmlFor={`job-link-company-${index}`}>
+                      <input
+                        id={`job-link-company-${index}`}
+                        type="checkbox"
+                        checked={selectedCompanyNames.includes(group.companyName)}
+                        onChange={() => onToggleJobLinkCompany(group.companyName)}
+                        disabled={checking || writing || repairingLinks}
+                      />
+                      <span>
+                        {group.companyName}（{group.jobCount} 个）
+                        <small>{group.jobs.join("；")}</small>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+            </div>
+          )}
+          {jobLinkResult && (
+            <div className={`writeResult ${jobLinkResult.status ?? "failed"}`}>
+              {formatJobLinkRepairStatus(jobLinkResult)}
+            </div>
+          )}
+          <button
+            className="secondary"
+            type="button"
+            onClick={onInspectJobLinks}
+            disabled={checking || writing || repairingLinks}
+          >
+            {repairingLinks ? "正在检查或补全…" : "检查岗位链接"}
+          </button>
+          {jobLinkPlan?.ok && jobLinkPlan.updateCount > 0 && (
+            <button
+              className="primary"
+              type="button"
+              onClick={onRepairJobLinks}
+              disabled={!canRepair}
+            >
+              确认补全已选 {selectedJobCount} 个岗位链接
+            </button>
+          )}
+        </details>
+      )}
     </section>
   );
 }

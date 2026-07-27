@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PRODUCTION_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
 import { buildFeishuOpenApiPlan } from "../src/lib/feishuOpenApiPlan.js";
 import { verifyJdWrite, verifySummaryWrite } from "../src/lib/feishuWriteVerifier.js";
 import { draft, initialSnapshot, successfulSnapshots } from "./helpers/feishuWriteScenario.js";
@@ -11,10 +12,10 @@ describe("Feishu persisted-write verification", () => {
   });
 
   it("accepts only the complete root-level JD and exact summary structure", () => {
-    const { plan, jd, complete } = successfulSnapshots();
+    const { plan, linkedPlan, jd, complete } = successfulSnapshots();
 
     expect(verifyJdWrite(jd, plan)).toEqual({ ok: true, errors: [] });
-    expect(verifySummaryWrite(complete, plan)).toEqual({ ok: true, errors: [] });
+    expect(verifySummaryWrite(complete, linkedPlan)).toEqual({ ok: true, errors: [] });
   });
 
   it("rejects a company nested under the previous company or rendered at the wrong heading level", () => {
@@ -51,12 +52,12 @@ describe("Feishu persisted-write verification", () => {
   });
 
   it("verifies both sections during an unnumbered JD-only recovery", () => {
-    const { unnumberedJd, complete } = successfulSnapshots();
+    const { unnumberedJd, complete, linkedPlan } = successfulSnapshots();
     const plan = buildFeishuOpenApiPlan(unnumberedJd, draft);
 
     expect(plan.mode).toBe("resume-new-company");
     expect(verifyJdWrite(unnumberedJd, plan)).toEqual({ ok: true, errors: [] });
-    expect(verifySummaryWrite(complete, plan)).toEqual({ ok: true, errors: [] });
+    expect(verifySummaryWrite(complete, { ...plan, jobs: linkedPlan.jobs })).toEqual({ ok: true, errors: [] });
   });
 
   it("rejects wrong job counts, ordinals, title text, and root sibling positions", () => {
@@ -76,17 +77,30 @@ describe("Feishu persisted-write verification", () => {
   });
 
   it("rejects summary blocks at the wrong position or with incomplete Bullet text", () => {
-    const { plan, complete } = successfulSnapshots();
+    const { linkedPlan, complete } = successfulSnapshots();
     complete.portfolio.companies[0].index += 1;
     complete.portfolio.companies[0].jobs[0].text = "品牌设计";
     complete.portfolio.companies[0].jobs[1].blockType = 2;
 
-    const result = verifySummaryWrite(complete, plan);
+    const result = verifySummaryWrite(complete, linkedPlan);
 
     expect(result.ok).toBe(false);
     expect(result.errors.join(" ")).toContain("计划位置");
     expect(result.errors.join(" ")).toContain("Bullet");
     expect(result.errors.join(" ")).toContain("完整文本");
+  });
+
+  it("rejects a missing or incorrect Portfolio job anchor", () => {
+    const { linkedPlan, complete } = successfulSnapshots();
+    complete.portfolio.companies[0].jobs[0].linkUrl = "";
+    complete.portfolio.companies[0].jobs[1].linkUrl = "https://example.com/wrong";
+
+    const result = verifySummaryWrite(complete, linkedPlan);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join(" ")).toContain("链接");
+    expect(result.errors.join(" ")).toContain("品牌设计");
+    expect(result.errors.join(" ")).toContain("销售主管/分销主管");
   });
 
   it("verifies append targets without requiring a second company heading", () => {
@@ -107,23 +121,33 @@ describe("Feishu persisted-write verification", () => {
     });
     after.portfolio.companies[0].jobs.push({
       title: "新增岗位",
+      location: "上海",
+      employment: "社招",
       text: "新增岗位｜上海｜社招",
       blockId: "appended-summary-job",
       blockType: 12,
-      index: plan.summaryTarget.index
+      index: plan.summaryTarget.index,
+      linkUrl: `${PRODUCTION_FEISHU_DOC_URL}#appended-job`
     });
+    const linkedPlan = {
+      ...plan,
+      jobs: [{
+        ...plan.jobs[0],
+        linkUrl: `${PRODUCTION_FEISHU_DOC_URL}#appended-job`
+      }]
+    };
 
     expect(plan.mode).toBe("append-jobs");
     expect(verifyJdWrite(after, plan).ok).toBe(true);
-    expect(verifySummaryWrite(after, plan).ok).toBe(true);
+    expect(verifySummaryWrite(after, linkedPlan).ok).toBe(true);
   });
 
   it("requires a fresh document revision before allowing the next phase", () => {
-    const { plan, jd, complete } = successfulSnapshots();
+    const { plan, linkedPlan, jd, complete } = successfulSnapshots();
     jd.revisionId = undefined;
     complete.revisionId = -1;
 
     expect(verifyJdWrite(jd, plan).errors.join(" ")).toContain("版本号");
-    expect(verifySummaryWrite(complete, plan).errors.join(" ")).toContain("版本号");
+    expect(verifySummaryWrite(complete, linkedPlan).errors.join(" ")).toContain("版本号");
   });
 });

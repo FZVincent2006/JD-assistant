@@ -2,6 +2,7 @@ import fixture from "../fixtures/feishu-structural-sample.json";
 import { buildBlockModel } from "../../src/lib/feishuBlockModel.js";
 import { buildFeishuOpenApiPlan } from "../../src/lib/feishuOpenApiPlan.js";
 import { inspectRecruitingDocument } from "../../src/lib/feishuTemplateReader.js";
+import { PRODUCTION_FEISHU_DOC_URL } from "../../src/lib/feishuConfig.js";
 
 export const draft = {
   companyName: "CoFANCY 可糖",
@@ -70,6 +71,13 @@ export function successfulSnapshots() {
   jd.revisionId += 1;
   jd.jd.companies[0].headingSequence = "auto";
 
+  const linkedPlan = {
+    ...structuredClone(plan),
+    jobs: plan.jobs.map((job, index) => ({
+      ...structuredClone(job),
+      linkUrl: `${PRODUCTION_FEISHU_DOC_URL}#new-job-${index + 1}`
+    }))
+  };
   const complete = structuredClone(jd);
   complete.revisionId += 1;
   complete.portfolio.companies.unshift({
@@ -83,8 +91,19 @@ export function successfulSnapshots() {
       text: `${job.title}｜${job.location}｜${job.employment}`,
       blockId: `new-summary-job-${index + 1}`,
       blockType: 12,
-      index: plan.summaryTarget.index + 1 + index
+      index: plan.summaryTarget.index + 1 + index,
+      location: job.location,
+      employment: job.employment,
+      linkUrl: `${PRODUCTION_FEISHU_DOC_URL}#new-job-${index + 1}`,
+      elements: [{
+        text_run: {
+          content: `${job.title}｜${job.location}｜${job.employment}`,
+          text_element_style: {
+            link: { url: `${PRODUCTION_FEISHU_DOC_URL}#new-job-${index + 1}` }
+          }
+        }
+      }]
     }))
   });
-  return { initial, plan, unnumberedJd, jd, complete };
+  return { initial, plan, linkedPlan, unnumberedJd, jd, complete };
 }
