@@ -158,6 +158,11 @@ describe("historical Portfolio job-link maintenance", () => {
     errors: []
   };
 
+  it("treats the initial null plan as an empty link plan", () => {
+    expect(countSelectedJobLinks(null, [])).toBe(0);
+    expect(groupJobLinkUpdates(null)).toEqual([]);
+  });
+
   it("enables repair only for an authorized, current, non-empty safe plan", () => {
     expect(canRepairJobLinks({
       authStatus: "authorized",

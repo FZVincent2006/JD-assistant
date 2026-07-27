@@ -35,9 +35,9 @@ describe("production Feishu operator copy", () => {
     }
   });
 
-  it("documents automatic planning checks in version 0.2.4", () => {
+  it("documents automatic planning checks in version 0.2.5", () => {
     const manifest = JSON.parse(read("public/manifest.json"));
-    expect(manifest.version).toBe("0.2.4");
+    expect(manifest.version).toBe("0.2.5");
 
     for (const path of ["README.md", "CODEX_INSTALL.md", "distribution/安装说明.md"]) {
       const text = read(path);
