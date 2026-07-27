@@ -206,6 +206,32 @@ textarea {
   margin: 0;
 }
 
+.linkMaintenance {
+  border-top: 1px solid #e1d5c3;
+  padding-top: 8px;
+}
+
+.linkMaintenance summary {
+  color: #6b5744;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.linkMaintenance[open] {
+  display: grid;
+  gap: 9px;
+}
+
+.linkMaintenance[open] summary {
+  margin-bottom: 2px;
+}
+
+.linkUpdateList {
+  max-height: 180px;
+  overflow: auto;
+}
+
 .planCard span {
   color: #7d6c59;
   font-size: 11px;

@@ -79,6 +79,51 @@ export function canWriteFeishu({ authStatus, inspection, plan, errors = [], writ
     && !writing;
 }
 
+export function canRepairJobLinks({ authStatus, plan, repairing = false }) {
+  return authStatus === "authorized"
+    && Boolean(plan?.ok)
+    && Number.isInteger(plan.baseRevisionId)
+    && Number.isInteger(plan.updateCount)
+    && plan.updateCount > 0
+    && !repairing;
+}
+
+export function describeJobLinkPlan(plan = {}) {
+  if (!plan.ok) {
+    return {
+      title: "岗位链接计划不可执行",
+      detail: (plan.errors ?? []).join("；") || "请检查正式招聘文档结构。",
+      updates: []
+    };
+  }
+  if (!plan.updateCount) {
+    return {
+      title: "全部岗位链接已正确",
+      detail: `共检查 ${plan.totalJobs ?? 0} 个岗位，无需修改正式文档。`,
+      updates: []
+    };
+  }
+  return {
+    title: `发现 ${plan.updateCount} 个岗位链接需要补全`,
+    detail: `共检查 ${plan.totalJobs ?? 0} 个岗位，${plan.correctLinks ?? 0} 个已经正确。`,
+    updates: (plan.updates ?? []).map((update) =>
+      `${update.companyName}｜${update.jobText}`
+    )
+  };
+}
+
+export function formatJobLinkRepairStatus(result = {}) {
+  const diagnostics = formatWriteDiagnostics(result);
+  if (result.ok || result.status === "success") {
+    return `岗位链接补全成功：已更新 ${result.updatedLinks ?? 0} 个，共检查 ${result.totalJobs ?? 0} 个岗位。${diagnostics}`;
+  }
+  const detail = result.repairHint || "请检查正式招聘文档。";
+  if (result.status === "unknown") {
+    return `岗位链接结果未知：${detail}${diagnostics}`;
+  }
+  return `岗位链接补全失败：${detail}${diagnostics}`;
+}
+
 export function describeFeishuPlan(plan) {
   if (!plan?.ok) {
     return {
@@ -108,7 +153,10 @@ function phaseLabel(stage) {
     "jd-write": "岗位 JD 写入",
     "jd-verify": "岗位 JD 校验",
     "summary-write": "Portfolio 写入",
-    "summary-verify": "Portfolio 校验"
+    "summary-verify": "Portfolio 校验",
+    "job-link-preflight": "岗位链接检查",
+    "job-link-write": "岗位链接写入",
+    "job-link-verify": "岗位链接校验"
   };
   return labels[stage] ?? "飞书操作";
 }

@@ -14,7 +14,7 @@ describe("production Feishu operator copy", () => {
     expect(app).toContain("仅写入正式招聘文档");
     expect(app).not.toContain("打开文档检查");
     expect(app).not.toContain("sendFeishuInspectRequest");
-    expect(app).not.toContain("onInspect");
+    expect(app).not.toContain("onInspectDocument");
     expect(app).not.toMatch(/<button[^>]*>\s*检查正式招聘文档\s*<\/button>/);
     expect(app).not.toContain("测试副本");
   });
@@ -44,5 +44,16 @@ describe("production Feishu operator copy", () => {
       expect(text, path).toContain("检查并生成写入计划");
       expect(text, path).not.toContain("点击“检查正式招聘文档”");
     }
+  });
+
+  it("keeps historical job-link maintenance optional and collapsed", () => {
+    const app = read("src/sidepanel/App.jsx");
+
+    expect(app).toContain("<details");
+    expect(app).toContain("维护已有岗位链接");
+    expect(app).toContain("检查岗位链接");
+    expect(app).toContain("确认补全");
+    expect(app).toContain("FEISHU_JOB_LINK_PLAN");
+    expect(app).toContain("FEISHU_JOB_LINK_WRITE");
   });
 });
