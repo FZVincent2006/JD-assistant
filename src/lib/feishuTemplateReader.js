@@ -61,11 +61,16 @@ function inspectPortfolio(model, rootChildren, headingIndex, jdHeadingIndex) {
     while (cursor < childIds.length) {
       const jobBlock = model.blocks.get(childIds[cursor]);
       if (jobBlock?.block_type !== BLOCK.BULLET) break;
+      const text = textOfBlock(jobBlock);
+      const parsed = parseSummaryJob(text);
+      const elements = structuredClone(jobBlock.bullet?.elements ?? []);
       jobs.push({
-        title: jobTitleFromSummary(textOfBlock(jobBlock)),
-        text: textOfBlock(jobBlock),
+        ...parsed,
+        text,
         blockId: jobBlock.block_id,
-        index: cursor
+        index: cursor,
+        elements,
+        linkUrl: consistentTextLink(elements)
       });
       cursor += 1;
     }
@@ -310,8 +315,23 @@ function quoteSectionKey(value) {
   return "";
 }
 
-function jobTitleFromSummary(value) {
-  return String(value).split(/[｜|]/)[0].trim();
+function parseSummaryJob(value) {
+  const parts = String(value).split(/[｜|]/).map((part) => part.trim());
+  return {
+    title: parts[0] ?? "",
+    location: parts.length === 3 ? parts[1] : "",
+    employment: parts.length === 3 ? parts[2] : ""
+  };
+}
+
+function consistentTextLink(elements) {
+  if (!Array.isArray(elements) || !elements.length) return "";
+  const textRuns = elements.filter((element) => String(element?.text_run?.content ?? "").length > 0);
+  if (!textRuns.length || textRuns.length !== elements.length) return "";
+  const links = textRuns.map((element) => String(
+    element.text_run?.text_element_style?.link?.url ?? ""
+  ).trim());
+  return links[0] && links.every((link) => link === links[0]) ? links[0] : "";
 }
 
 function uniqueHeading(model, needle) {

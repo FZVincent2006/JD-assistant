@@ -35,8 +35,43 @@ describe("Feishu recruiting document templates", () => {
     });
     expect(snapshot.portfolio.companies[0]).toMatchObject({
       name: "示例公司甲",
-      jobs: [{ title: "示例岗位甲" }]
+      jobs: [{
+        title: "示例岗位甲",
+        location: "上海",
+        employment: "社招",
+        linkUrl: "",
+        elements: [{ text_run: { content: "示例岗位甲｜上海｜社招" } }]
+      }]
     });
+  });
+
+  it("recognizes one consistent full-line Portfolio link across multiple text runs", () => {
+    const linked = structuredClone(fixture.items);
+    const job = linked.find((block) => block.block_id === "summary-job-a1");
+    job.bullet.elements = [
+      {
+        text_run: {
+          content: "示例岗位甲｜",
+          text_element_style: { bold: true, link: { url: "https://example.com/anchor" } }
+        }
+      },
+      {
+        text_run: {
+          content: "上海｜社招",
+          text_element_style: { link: { url: "https://example.com/anchor" } }
+        }
+      }
+    ];
+
+    const snapshot = inspect(linked);
+
+    expect(snapshot.portfolio.companies[0].jobs[0]).toMatchObject({
+      title: "示例岗位甲",
+      location: "上海",
+      employment: "社招",
+      linkUrl: "https://example.com/anchor"
+    });
+    expect(snapshot.portfolio.companies[0].jobs[0].elements).toHaveLength(2);
   });
 
   it("copies style contracts but never copies source prose", () => {
