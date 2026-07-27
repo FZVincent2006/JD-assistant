@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/feishu-structural-sample.json";
+import { PRODUCTION_FEISHU_DOC_URL } from "../src/lib/feishuConfig.js";
 import { buildBlockModel, fieldForBlockType } from "../src/lib/feishuBlockModel.js";
 import { renderJdDescendants, renderSummaryDescendants } from "../src/lib/feishuBlockRenderer.js";
 import { buildFeishuOpenApiPlan } from "../src/lib/feishuOpenApiPlan.js";
@@ -111,31 +112,41 @@ describe("Feishu native block rendering", () => {
     expect(request.descendants.some((block) => block.block_type === 3 || block.block_type === 4 || block.block_type === 19)).toBe(false);
   });
 
-  it("renders the summary hierarchy and applies only a safe company link", () => {
-    const { snapshot, plan } = setup();
-    const request = renderSummaryDescendants(draft, plan, snapshot.templates.portfolio);
+  it("renders the summary hierarchy with a company website and one JD anchor per job", () => {
+    const { snapshot } = setup();
+    const { linkedPlan } = successfulSnapshots();
+    const matchingDraft = { ...draft, companyName: resumeDraft.companyName };
+    const request = renderSummaryDescendants(matchingDraft, linkedPlan, snapshot.templates.portfolio);
     const byId = blockMap(request);
     const company = byId.get(request.children_id[0]);
     const run = company.heading3.elements[0].text_run;
+    const firstJobRun = byId.get("summary-job-1").bullet.elements[0].text_run;
+    const secondJobRun = byId.get("summary-job-2").bullet.elements[0].text_run;
 
     expect(request.children_id.map((id) => byId.get(id).block_type)).toEqual([5, 12, 12]);
-    expect(run.content).toBe("CoFANCY <可糖>");
-    expect(run.text_element_style.link).toEqual({ url: draft.website });
+    expect(run.content).toBe(resumeDraft.companyName);
+    expect(run.text_element_style.link).toEqual({ url: matchingDraft.website });
+    expect(firstJobRun.text_element_style.link).toEqual({
+      url: `${PRODUCTION_FEISHU_DOC_URL}#new-job-1`
+    });
+    expect(secondJobRun.text_element_style.link).toEqual({
+      url: `${PRODUCTION_FEISHU_DOC_URL}#new-job-2`
+    });
     expect(allTexts(request)).toContain("品牌设计｜上海｜社招");
 
-    const plainDraft = { ...draft, website: "" };
-    const plainRequest = renderSummaryDescendants(plainDraft, setup(plainDraft).plan, snapshot.templates.portfolio);
+    const plainDraft = { ...matchingDraft, website: "" };
+    const plainRequest = renderSummaryDescendants(plainDraft, linkedPlan, snapshot.templates.portfolio);
     const plainCompany = blockMap(plainRequest).get(plainRequest.children_id[0]);
     expect(plainCompany.heading3.elements[0].text_run.text_element_style).not.toHaveProperty("link");
   });
 
   it("renders the complete Portfolio company block for an exact JD-only recovery", () => {
-    const { unnumberedJd } = successfulSnapshots();
+    const { unnumberedJd, linkedPlan } = successfulSnapshots();
     const plan = buildFeishuOpenApiPlan(unnumberedJd, resumeDraft);
 
     const request = renderSummaryDescendants(
       resumeDraft,
-      plan,
+      { ...plan, jobs: linkedPlan.jobs },
       unnumberedJd.templates.portfolio
     );
 

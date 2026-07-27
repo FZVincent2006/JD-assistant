@@ -1,5 +1,6 @@
 import { renderJdDescendants, renderSummaryDescendants } from "../lib/feishuBlockRenderer.js";
 import { PRODUCTION_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
+import { resolvePlannedJobLinks } from "../lib/feishuJobLinks.js";
 import { buildFeishuOpenApiPlan } from "../lib/feishuOpenApiPlan.js";
 import { verifyJdWrite, verifySummaryWrite } from "../lib/feishuWriteVerifier.js";
 
@@ -56,12 +57,10 @@ async function executeWrite({ client, inspect, wait, draft }) {
   }
 
   let jdRequest;
-  let summaryRequest;
   try {
     if (plan.mode !== "resume-new-company") {
       jdRequest = renderJdDescendants(draft, plan, initial.templates.jd);
     }
-    summaryRequest = renderSummaryDescendants(draft, plan, initial.templates.portfolio);
   } catch {
     return makeResult({
       draft,
@@ -137,6 +136,36 @@ async function executeWrite({ client, inspect, wait, draft }) {
 
   completedStages.push("jd");
 
+  const linkResolution = resolvePlannedJobLinks(afterJd, plan);
+  if (!linkResolution.ok) {
+    return makeResult({
+      draft,
+      plan,
+      completedStages,
+      status: "partial",
+      failedStage: "jd-verify",
+      repairHint: `岗位 JD 已完成，但无法生成 Portfolio 岗位链接：${linkResolution.errors.join("；")}`
+    });
+  }
+  const linkedPlan = { ...plan, jobs: linkResolution.jobs };
+  let summaryRequest;
+  try {
+    summaryRequest = renderSummaryDescendants(
+      draft,
+      linkedPlan,
+      afterJd.templates.portfolio
+    );
+  } catch {
+    return makeResult({
+      draft,
+      plan,
+      completedStages,
+      status: "partial",
+      failedStage: "summary-write",
+      repairHint: "岗位 JD 已完成，但无法生成带跳转链接的 Portfolio 块。"
+    });
+  }
+
   let afterSummary;
   let summaryApiSucceeded = false;
   try {
@@ -179,7 +208,7 @@ async function executeWrite({ client, inspect, wait, draft }) {
         repairHint: "Portfolio 写入请求状态未知且无法回读；不要重复提交，请先人工检查正式招聘文档。"
       });
     }
-    const timeoutVerification = verifySummaryWrite(afterSummary, plan);
+    const timeoutVerification = verifySummaryWrite(afterSummary, linkedPlan);
     if (!timeoutVerification.ok) {
       return failedForError({
         draft,
@@ -192,7 +221,7 @@ async function executeWrite({ client, inspect, wait, draft }) {
     }
   }
 
-  const summaryVerification = verifySummaryWrite(afterSummary, plan);
+  const summaryVerification = verifySummaryWrite(afterSummary, linkedPlan);
   if (!summaryVerification.ok) {
     return makeResult({
       draft,

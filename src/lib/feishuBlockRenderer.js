@@ -83,7 +83,8 @@ export function renderSummaryDescendants(draft, plan, templates) {
     addRoot(childrenId, descendants, textBlock(
       `summary-job-${index + 1}`,
       templates.bullet,
-      `${job.title}｜${job.location}｜${job.employment}`
+      `${job.title}｜${job.location}｜${job.employment}`,
+      job.linkUrl
     ));
   });
 
