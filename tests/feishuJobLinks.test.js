@@ -133,6 +133,42 @@ describe("historical Portfolio job-link repair plans", () => {
     expect(plan.updates[0].companyName).toBe("示例公司乙");
   });
 
+  it("keeps safe updates executable while reporting unrelated manual issues", () => {
+    const snapshot = initialSnapshot();
+    snapshot.portfolio.companies[0].jobs[0].elements[0].text_run.text_element_style = {
+      link: { url: "https://example.com/legacy" }
+    };
+
+    const plan = buildJobLinkRepairPlan(snapshot);
+
+    expect(plan).toMatchObject({
+      ok: true,
+      totalJobs: 2,
+      correctLinks: 0,
+      errors: []
+    });
+    expect(plan.updates.map((item) => item.blockId)).toEqual(["summary-job-b1"]);
+    expect(plan.issues).toHaveLength(1);
+    expect(plan.issues[0].message).toContain("已有链接");
+    expect(plan.issues[0].blockId).toBe("summary-job-a1");
+  });
+
+  it("returns an executable manual-only plan when no safe update remains", () => {
+    const snapshot = initialSnapshot();
+    for (const company of snapshot.portfolio.companies) {
+      company.jobs[0].elements[0].text_run.text_element_style = {
+        link: { url: "https://example.com/legacy" }
+      };
+    }
+
+    const plan = buildJobLinkRepairPlan(snapshot);
+
+    expect(plan.ok).toBe(true);
+    expect(plan.updates).toEqual([]);
+    expect(plan.issues).toHaveLength(2);
+    expect(plan.errors).toEqual([]);
+  });
+
   it("preserves existing run styles while adding a missing target", () => {
     const snapshot = initialSnapshot();
     const job = snapshot.portfolio.companies[0].jobs[0];
@@ -174,14 +210,15 @@ describe("historical Portfolio job-link repair plans", () => {
     ]);
   });
 
-  it("rejects ambiguous jobs, unsafe existing links, and non-text Portfolio elements", () => {
+  it("reports ambiguous jobs, unsafe existing links, and non-text elements as manual issues", () => {
     const ambiguous = initialSnapshot();
     const duplicate = structuredClone(ambiguous.jd.companies[0].jobs[0]);
     duplicate.blockId = "duplicate-job-heading";
     ambiguous.jd.companies[0].jobs.push(duplicate);
     const ambiguousPlan = buildJobLinkRepairPlan(ambiguous);
-    expect(ambiguousPlan.ok).toBe(false);
-    expect(ambiguousPlan.errors.join("；")).toContain("示例岗位甲");
+    expect(ambiguousPlan.ok).toBe(true);
+    expect(ambiguousPlan.errors).toEqual([]);
+    expect(ambiguousPlan.issues.map((issue) => issue.message).join("；")).toContain("示例岗位甲");
 
     const external = initialSnapshot();
     external.portfolio.companies[0].jobs[0].linkUrl = "https://example.com/wrong";
@@ -189,8 +226,8 @@ describe("historical Portfolio job-link repair plans", () => {
       link: { url: "https://example.com/wrong" }
     };
     const externalPlan = buildJobLinkRepairPlan(external);
-    expect(externalPlan.ok).toBe(false);
-    expect(externalPlan.errors.join("；")).toContain("已有链接");
+    expect(externalPlan.ok).toBe(true);
+    expect(externalPlan.issues.map((issue) => issue.message).join("；")).toContain("已有链接");
     expect(externalPlan.updates.some((item) => item.blockId === "summary-job-a1")).toBe(false);
 
     const mixed = initialSnapshot();
@@ -201,16 +238,16 @@ describe("historical Portfolio job-link repair plans", () => {
       { text_run: { content: "上海｜社招" } }
     ];
     const mixedPlan = buildJobLinkRepairPlan(mixed);
-    expect(mixedPlan.ok).toBe(false);
-    expect(mixedPlan.errors.join("；")).toContain("混合");
+    expect(mixedPlan.ok).toBe(true);
+    expect(mixedPlan.issues.map((issue) => issue.message).join("；")).toContain("混合");
 
     const nonText = initialSnapshot();
     nonText.portfolio.companies[0].jobs[0].elements = [{
       mention_user: { user_id: "ou_private" }
     }];
     const nonTextPlan = buildJobLinkRepairPlan(nonText);
-    expect(nonTextPlan.ok).toBe(false);
-    expect(nonTextPlan.errors.join("；")).toContain("富文本");
+    expect(nonTextPlan.ok).toBe(true);
+    expect(nonTextPlan.issues.map((issue) => issue.message).join("；")).toContain("富文本");
   });
 
   it("rejects a batch larger than the single-request safety limit", () => {
