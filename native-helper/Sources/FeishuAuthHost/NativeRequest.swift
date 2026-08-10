@@ -2,6 +2,7 @@ import Foundation
 
 package enum NativeHostRequest {
     case exchange(ExchangeCodeRequest)
+    case tenantToken(TenantTokenRequest)
     case applyHeadingNumbering
 }
 
@@ -28,6 +29,13 @@ package func decodeNativeHostRequest(_ data: Data) throws -> NativeHostRequest {
             throw TokenExchangeError(message: "Invalid native request")
         }
         return .exchange(try decodeExchangeRequest(data))
+    case "GET_TENANT_TOKEN":
+        let allowed = Set(["type", "appId"])
+        guard Set(object.keys) == allowed,
+              let appId = object["appId"] as? String else {
+            throw TokenExchangeError(message: "Invalid native request")
+        }
+        return .tenantToken(TenantTokenRequest(type: type, appId: appId))
     case "APPLY_HEADING_NUMBERING":
         guard Set(object.keys) == Set(["type"]) else {
             throw TokenExchangeError(message: "Invalid native numbering request")

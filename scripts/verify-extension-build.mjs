@@ -38,7 +38,12 @@ const approvedFeishuHosts = [
 ];
 const hostPermissionValues = manifest.host_permissions ?? [];
 const hostPermissions = new Set(hostPermissionValues);
-for (const required of [...approvedFeishuHosts, "https://partner.outlook.cn/*"]) {
+for (const required of [
+  ...approvedFeishuHosts,
+  "https://partner.outlook.cn/*",
+  "https://login.chinacloudapi.cn/*",
+  "https://microsoftgraph.chinacloudapi.cn/*"
+]) {
   if (!hostPermissions.has(required)) throw new Error(`dist manifest is missing host permission: ${required}`);
 }
 const feishuHosts = hostPermissionValues.filter((host) => host.includes("feishu.cn"));
@@ -88,7 +93,9 @@ for (const messageType of [
 for (const messageType of [
   "OUTLOOK_MONITOR_GET",
   "OUTLOOK_MONITOR_SAVE_CONFIG",
-  "OUTLOOK_MONITOR_SET_ENABLED"
+  "OUTLOOK_MONITOR_SET_ENABLED",
+  "OUTLOOK_MONITOR_AUTHORIZE_GRAPH",
+  "GET_TENANT_TOKEN"
 ]) {
   if (!background.includes(messageType)) throw new Error(`dist background is missing ${messageType}`);
 }

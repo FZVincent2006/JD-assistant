@@ -12,6 +12,8 @@ import {
   Send
 } from "lucide-react";
 import {
+  authorizeOutlookGraph,
+  clearOutlookGraphAuthorization,
   getOutlookMonitorStatus,
   rebaselineOutlookMonitor,
   saveOutlookMonitorConfig,
@@ -29,6 +31,10 @@ export default function OutlookMonitorPanel() {
   const [snapshot, setSnapshot] = useState(null);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [secret, setSecret] = useState("");
+  const [deliveryMode, setDeliveryMode] = useState("webhook");
+  const [chatId, setChatId] = useState("");
+  const [outlookClientId, setOutlookClientId] = useState("");
+  const [outlookTenantId, setOutlookTenantId] = useState("");
   const [rulesConfirmed, setRulesConfirmed] = useState(false);
   const [message, setMessage] = useState("正在读取监控状态…");
   const [busy, setBusy] = useState(false);
@@ -51,6 +57,7 @@ export default function OutlookMonitorPanel() {
     if (result.snapshot) {
       setSnapshot(result.snapshot);
       setRulesConfirmed(Boolean(result.snapshot.config?.rulesConfirmed));
+      setDeliveryMode(result.snapshot.config?.deliveryMode || "webhook");
     }
     setMessage(successMessage);
     return true;
@@ -68,12 +75,23 @@ export default function OutlookMonitorPanel() {
 
   async function saveConfig() {
     const saved = await run(
-      () => saveOutlookMonitorConfig({ webhookUrl, secret, rulesConfirmed }),
+      () => saveOutlookMonitorConfig({
+        deliveryMode,
+        webhookUrl,
+        secret,
+        chatId,
+        outlookClientId,
+        outlookTenantId,
+        rulesConfirmed
+      }),
       "机器人配置已保存在这台电脑的 Chrome 中。"
     );
     if (saved) {
       setWebhookUrl("");
       setSecret("");
+      setChatId("");
+      setOutlookClientId("");
+      setOutlookTenantId("");
     }
   }
 
@@ -81,6 +99,20 @@ export default function OutlookMonitorPanel() {
     await run(
       () => testOutlookMonitorFeishu(),
       "测试提醒已发送，请在四人群中确认。"
+    );
+  }
+
+  async function connectOutlookContent() {
+    await run(
+      () => authorizeOutlookGraph(),
+      "已授权读取新邮件正文和简历附件。"
+    );
+  }
+
+  async function disconnectOutlookContent() {
+    await run(
+      () => clearOutlookGraphAuthorization(),
+      "已清除 Outlook 正文与附件授权。"
     );
   }
 
@@ -147,24 +179,70 @@ export default function OutlookMonitorPanel() {
           <Bot size={17} />
           <h3>四人群机器人</h3>
         </div>
-        <label htmlFor="outlook-webhook">Webhook</label>
-        <input
-          id="outlook-webhook"
-          type="password"
-          autoComplete="off"
-          placeholder={snapshot?.config?.webhookConfigured ? "已配置；留空表示不更换" : "https://open.feishu.cn/open-apis/bot/v2/hook/..."}
-          value={webhookUrl}
-          onChange={(event) => setWebhookUrl(event.target.value)}
-        />
-        <label htmlFor="outlook-secret">签名密钥</label>
-        <input
-          id="outlook-secret"
-          type="password"
-          autoComplete="off"
-          placeholder={snapshot?.config?.secretConfigured ? "已配置；留空表示不更换" : "粘贴机器人安全设置中的签名密钥"}
-          value={secret}
-          onChange={(event) => setSecret(event.target.value)}
-        />
+        <label htmlFor="outlook-delivery-mode">提醒内容</label>
+        <select
+          id="outlook-delivery-mode"
+          value={deliveryMode}
+          onChange={(event) => setDeliveryMode(event.target.value)}
+        >
+          <option value="rich">正文 + 简历附件（推荐）</option>
+          <option value="webhook">仅主题提醒（兼容模式）</option>
+        </select>
+        {deliveryMode === "rich" ? (
+          <>
+            <label htmlFor="outlook-chat-id">飞书群 ID</label>
+            <input
+              id="outlook-chat-id"
+              type="text"
+              autoComplete="off"
+              placeholder={snapshot?.config?.chatIdConfigured ? "已配置；留空表示不更换" : "oc_..."}
+              value={chatId}
+              onChange={(event) => setChatId(event.target.value)}
+            />
+            <label htmlFor="outlook-client-id">Outlook 应用 Client ID</label>
+            <input
+              id="outlook-client-id"
+              type="text"
+              autoComplete="off"
+              placeholder={snapshot?.config?.outlookClientConfigured ? "已配置；留空表示不更换" : "Azure 中国应用的 Client ID"}
+              value={outlookClientId}
+              onChange={(event) => setOutlookClientId(event.target.value)}
+            />
+            <label htmlFor="outlook-tenant-id">Outlook Tenant ID</label>
+            <input
+              id="outlook-tenant-id"
+              type="text"
+              autoComplete="off"
+              placeholder={snapshot?.config?.outlookTenantConfigured ? "已配置；留空表示不更换" : "Azure 中国租户 ID"}
+              value={outlookTenantId}
+              onChange={(event) => setOutlookTenantId(event.target.value)}
+            />
+            <p className="fieldHint">
+              需要在 Azure 中国为本扩展登记应用，并授权 Mail.Read 和 Mail.Read.Shared。
+            </p>
+          </>
+        ) : (
+          <>
+            <label htmlFor="outlook-webhook">Webhook</label>
+            <input
+              id="outlook-webhook"
+              type="password"
+              autoComplete="off"
+              placeholder={snapshot?.config?.webhookConfigured ? "已配置；留空表示不更换" : "https://open.feishu.cn/open-apis/bot/v2/hook/..."}
+              value={webhookUrl}
+              onChange={(event) => setWebhookUrl(event.target.value)}
+            />
+            <label htmlFor="outlook-secret">签名密钥</label>
+            <input
+              id="outlook-secret"
+              type="password"
+              autoComplete="off"
+              placeholder={snapshot?.config?.secretConfigured ? "已配置；留空表示不更换" : "粘贴机器人安全设置中的签名密钥"}
+              value={secret}
+              onChange={(event) => setSecret(event.target.value)}
+            />
+          </>
+        )}
         <label className="checkRow">
           <input
             type="checkbox"
@@ -177,6 +255,22 @@ export default function OutlookMonitorPanel() {
           <Save size={16} />
           保存机器人配置
         </button>
+        {deliveryMode === "rich" && (
+          snapshot?.config?.outlookGraphAuthorized ? (
+            <button className="secondary" type="button" onClick={disconnectOutlookContent} disabled={busy}>
+              取消 Outlook 正文授权
+            </button>
+          ) : (
+            <button
+              className="secondary"
+              type="button"
+              onClick={connectOutlookContent}
+              disabled={busy || !snapshot?.config?.outlookClientConfigured || !snapshot?.config?.outlookTenantConfigured}
+            >
+              授权读取正文和附件
+            </button>
+          )
+        )}
         <button
           className="secondary"
           type="button"
@@ -190,7 +284,13 @@ export default function OutlookMonitorPanel() {
 
       <section className="panel monitorChecklist">
         <h3>开启检查</h3>
-        <ChecklistItem ok={checklist.robotConfigured} text="机器人 Webhook 和签名已保存" />
+        <ChecklistItem
+          ok={checklist.robotConfigured}
+          text={checklist.richMode ? "群 ID 和 Outlook 应用信息已保存" : "机器人 Webhook 和签名已保存"}
+        />
+        {checklist.richMode && (
+          <ChecklistItem ok={checklist.contentAuthorized} text="已授权读取邮件正文和简历附件" />
+        )}
         <ChecklistItem ok={checklist.testSucceeded} text="四人群测试提醒已成功" />
         <ChecklistItem ok={checklist.rulesConfirmed} text="四个平台分流规则已确认" />
         <ChecklistItem ok={checklist.outlookReady} text="目标邮箱和提醒文件夹已打开" />

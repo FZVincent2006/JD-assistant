@@ -9,6 +9,14 @@ struct StubTokenExchanger: TokenExchanging {
     }
 }
 
+struct StubTenantTokenProvider: TenantTokenProviding {
+    let result: TokenResult
+
+    func token(_ request: TenantTokenRequest) async throws -> TokenResult {
+        result
+    }
+}
+
 final class SpyHeadingNumberer: HeadingNumbering, @unchecked Sendable {
     var calls = 0
     var error: HeadingNumberingError?
@@ -61,6 +69,17 @@ func runNativeHostTests() async throws -> Int {
     try expect(response.ok, "native host success response")
     try expect(response.accessToken == "short-lived-token", "native host returns short-lived token")
 
+    let tenantToken = await handleNativeRequest(
+        Data(#"{"type":"GET_TENANT_TOKEN","appId":"cli_test1234"}"#.utf8),
+        exchanger: StubTokenExchanger(result: TokenResult(accessToken: "unused", expiresIn: 1, scope: "")),
+        tenantTokenProvider: StubTenantTokenProvider(result: TokenResult(
+            accessToken: "tenant-token",
+            expiresIn: 7_200,
+            scope: ""
+        ))
+    )
+    try expect(tenantToken.ok && tenantToken.accessToken == "tenant-token", "native host returns tenant token")
+
     let unsupported = Data(#"{"type":"WRITE_DOCUMENT"}"#.utf8)
     let rejected = await handleNativeRequest(
         unsupported,
@@ -101,5 +120,5 @@ func runNativeHostTests() async throws -> Int {
         headingNumberer: numberer
     )
     try expect(!rejectedExchange.ok, "native host rejects extra exchange fields")
-    return 13
+    return 14
 }

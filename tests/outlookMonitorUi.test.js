@@ -40,10 +40,32 @@ describe("monitorSetupChecklist", () => {
       baselineComplete: false
     })).toEqual({
       robotConfigured: true,
+      richMode: false,
+      contentAuthorized: true,
       testSucceeded: true,
       rulesConfirmed: true,
       outlookReady: true,
       readyToEnable: true
+    });
+  });
+
+  it("requires Outlook content authorization in rich delivery mode", () => {
+    expect(monitorSetupChecklist({
+      config: {
+        deliveryMode: "rich",
+        chatIdConfigured: true,
+        outlookClientConfigured: true,
+        outlookTenantConfigured: true,
+        outlookGraphAuthorized: false,
+        rulesConfirmed: true,
+        testedAt: 123
+      },
+      page: { targetMailbox: true, targetFolder: true, loggedIn: true }
+    })).toMatchObject({
+      robotConfigured: true,
+      richMode: true,
+      contentAuthorized: false,
+      readyToEnable: false
     });
   });
 });

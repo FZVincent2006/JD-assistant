@@ -464,6 +464,12 @@ textarea {
   grid-template-columns: 1fr;
 }
 
+.fieldHint {
+  color: #7d7063;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .salaryGrid {
   display: grid;
   gap: 10px;

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  authorizeOutlookGraph,
+  clearOutlookGraphAuthorization,
   getOutlookMonitorStatus,
   rebaselineOutlookMonitor,
   saveOutlookMonitorConfig,
@@ -26,6 +28,8 @@ describe("Outlook monitor side-panel API", () => {
       rulesConfirmed: true
     }, chromeApi);
     await testOutlookMonitorFeishu(chromeApi);
+    await authorizeOutlookGraph(chromeApi);
+    await clearOutlookGraphAuthorization(chromeApi);
     await setOutlookMonitorEnabled(true, chromeApi);
     await rebaselineOutlookMonitor(true, chromeApi);
 
@@ -40,6 +44,8 @@ describe("Outlook monitor side-panel API", () => {
         }
       }],
       [{ type: "OUTLOOK_MONITOR_TEST_FEISHU" }],
+      [{ type: "OUTLOOK_MONITOR_AUTHORIZE_GRAPH" }],
+      [{ type: "OUTLOOK_MONITOR_CLEAR_GRAPH" }],
       [{ type: "OUTLOOK_MONITOR_SET_ENABLED", payload: { enabled: true } }],
       [{ type: "OUTLOOK_MONITOR_REBASELINE", payload: { confirmed: true } }]
     ]);

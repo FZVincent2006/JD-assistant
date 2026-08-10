@@ -18,7 +18,7 @@ macOS 上的 Chrome/Edge 扩展，用于解析招聘 JD，自动填入 Boss 直�
 - 飞书采用“授权 → 检查 → 生成计划 → 人工确认 → 分阶段写入 → API 回读校验”的流程。
 - 飞书只允许写入正式招聘文档：<https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d>。
 - 扩展只通过飞书 OpenAPI 读写这个固定正式文档，不提供测试/正式切换，不向飞书页面注入脚本，也不会发送自动编号快捷键。
-- Outlook 提醒只在本机运行；首次建立历史基线，不读取邮件正文或附件。
+- Outlook 提醒只在本机运行；首次建立历史基线。增强模式通过 Microsoft Graph 中国区读取新邮件正文和简历附件，并发送到指定私密飞书群；旧的仅主题 Webhook 模式继续保留。
 
 ## 当前能力
 
@@ -37,11 +37,18 @@ macOS 上的 Chrome/Edge 扩展，用于解析招聘 JD，自动填入 Boss 直�
 
 使用企业自建应用 `招聘 JD 发布助手`，App ID 为 `cli_aade4224b8789bef`。App Secret 不得写入仓库、`.env`、聊天或安装说明。
 
-飞书应用只需要以下三个用户身份权限：
+飞书文档功能需要以下三个用户身份权限：
 
 - `wiki:wiki:readonly`
 - `docx:document:readonly`
 - `docx:document:write_only`
+
+如需在 Outlook 提醒中发送邮件正文和简历附件，还需为同一应用开启机器人能力，并增加：
+
+- 以应用身份发送消息（`im:message:send_as_bot`）
+- 获取与上传图片或文件资源（`im:resource`）
+
+发布权限变更后，把应用机器人加入接收提醒的私密飞书群，并确保机器人拥有发言权限。
 
 管理员还需要：
 
@@ -210,19 +217,56 @@ CoFANCY 可糖是一个高端角膜接触镜品牌。
 `个人投递（需提醒）` 文件夹，并把新个人投递发送到用户配置的四人飞书群。
 扩展会排除脉脉、猎聘、实习僧和 BOSS 直聘等已有服务端规则处理的平台来源。
 
-首次配置：
+### 增强模式：正文和简历附件
+
+增强模式使用世纪互联运营的 Microsoft Graph 中国区接口。管理员需先在
+<https://portal.azure.cn> 完成一次应用登记：
+
+1. 新建“单页应用（SPA）”或允许授权码 + PKCE 的公共客户端应用。
+2. 添加固定回调地址：
+
+   ```text
+   https://mlhjjkclfiocgafhjdhoicghiabkeggg.chromiumapp.org/outlook
+   ```
+
+3. 添加 Microsoft Graph 委托权限 `Mail.Read` 和 `Mail.Read.Shared`，并允许
+   `offline_access`；按企业策略完成管理员同意。
+4. 记录“应用程序（客户端）ID”和“目录（租户）ID”。不要创建或粘贴 Outlook
+   Client Secret，扩展使用 PKCE，不需要邮箱密码或客户端密钥。
+
+飞书管理员同时需要完成本 README“飞书应用配置”中的机器人能力、消息与文件权限，
+并把应用机器人加入目标私密群。
+
+扩展内配置步骤：
+
+1. 在 Chrome/Edge 中登录 <https://partner.outlook.cn/mail/>，切换到目标邮箱和文件夹。
+2. 打开扩展侧栏，选择“Outlook 提醒”。
+3. 在“提醒内容”中选择“正文 + 简历附件（推荐）”。
+4. 填写目标群的 `oc_...` 群 ID、Azure 中国 Client ID 和 Tenant ID，确认排除规则并保存。
+5. 点击“授权读取正文和附件”，使用有权读取 `recruiting@zhenfund.com` 的账号授权。
+6. 点击“发送测试提醒”；确认无误后点击“建立基线并开启监控”。
+
+新邮件触发后，扩展会发送一张包含发件人、主题、时间和正文的飞书卡片，再把 PDF、
+DOC、DOCX 简历作为文件消息发送。单文件上限 30 MB，单封邮件附件总量上限 60 MB；
+其他文件和内嵌图片不会上传。正文最多发送 12,000 字，超出时会在卡片中标注截断。
+
+正文和附件只在处理当前新邮件时保存在内存，不写入扩展持久化队列或诊断日志。扩展只持久化
+去重状态、发送进度和 Outlook OAuth 刷新凭证。群成员应限制为确有招聘数据访问权限的同事。
+
+### 兼容模式：仅主题 Webhook
+
+如果暂时没有配置 Microsoft Graph 和飞书应用机器人，可以继续使用原来的提醒方式：
 
 1. 在四人飞书群中添加“自定义机器人”，开启签名校验。
 2. 在 Chrome/Edge 中登录 <https://partner.outlook.cn/mail/>，切换到目标邮箱和文件夹。
 3. 打开扩展侧栏，选择“Outlook 提醒”。
-4. 填写机器人 Webhook 和签名密钥，确认排除规则，保存配置。
+4. 在“提醒内容”中选择“仅主题提醒（兼容模式）”，填写机器人 Webhook 和签名密钥，确认排除规则并保存。
 5. 发送测试提醒；确认无误后点击“建立基线并开启监控”。
 
 首次开启只记录当前邮件作为历史基线，不发送旧邮件。之后页面变化会触发扫描，
 后台也会定期补扫。电脑休眠、浏览器关闭、Outlook 标签页关闭或登录失效时监控会暂停。
-Webhook 与签名密钥只保存在当前浏览器的本地扩展存储中；提醒只包含发件人、
-邮箱、主题、时间和是否有附件，不打开邮件、不改变已读状态、不移动邮件，
-也不读取正文或下载附件。
+兼容模式的 Webhook 与签名密钥只保存在当前浏览器的本地扩展存储中；提醒只包含发件人、
+邮箱、主题、时间和是否有附件。两种模式都不会点击邮件列表、改变已读状态或移动邮件。
 
 ## JD Skill 安装
 
@@ -246,7 +290,7 @@ npm run build
 - Boss/脉脉受保护文件哈希不变。
 - `dist/content.js` 和 `dist/outlook.js` 没有 ES module import。
 - manifest 不含剪贴板或 `debugger` 权限，也不包含飞书页面 content script；运行时只接受固定正式招聘文档。
-- 原生构建包含 `nativeMessaging`，仅用于授权令牌交换，不参与页面定位或编号。
+- 原生构建包含 `nativeMessaging`，用于飞书用户授权令牌交换和 Keychain 支持的应用机器人短期令牌，不参与 Outlook 页面定位或邮件内容解析。
 - Boss/脉脉 host 和 content-script matches 完整保留。
 - 后台构建包含全部飞书授权、检查、计划、写入、岗位链接维护和 Outlook 监控消息。
 - 构建后的 JavaScript 不包含硬编码飞书机器人 Webhook。

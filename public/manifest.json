@@ -24,6 +24,8 @@
     "https://*.maimai.com/*",
     "https://accounts.feishu.cn/*",
     "https://partner.outlook.cn/*",
+    "https://login.chinacloudapi.cn/*",
+    "https://microsoftgraph.chinacloudapi.cn/*",
     "https://open.feishu.cn/*"
   ],
   "action": {

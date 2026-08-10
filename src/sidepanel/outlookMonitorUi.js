@@ -6,6 +6,8 @@ const STATUS_COPY = {
   monitoring: "正常监控中，只提醒新的非平台投递。",
   outlook_tab_missing: "没有找到 Chrome 中的 Outlook 标签页。",
   outlook_unavailable: "暂时无法连接 Outlook 页面，请刷新标签页。",
+  outlook_api_unavailable: "暂时无法读取邮件正文或附件，系统会自动重试。",
+  outlook_api_authorization_required: "Outlook 正文与附件授权已失效，请重新授权。",
   login_required: "Outlook 登录已失效，请在 Chrome 中重新登录。",
   wrong_mailbox: "请切换到 recruiting@zhenfund.com 邮箱。",
   wrong_folder: "请在 Outlook 中打开“个人投递（需提醒）”文件夹。",
@@ -28,7 +30,10 @@ const EVENT_COPY = {
   outlook_unavailable: "暂时无法连接 Outlook",
   login_required: "Outlook 需要重新登录",
   wrong_mailbox: "当前不是目标邮箱",
-  wrong_folder: "当前没有打开提醒文件夹"
+  wrong_folder: "当前没有打开提醒文件夹",
+  outlook_graph_authorized: "已授权读取 Outlook 正文和附件",
+  outlook_graph_authorization_failed: "Outlook 正文与附件授权失败",
+  outlook_graph_cleared: "已清除 Outlook 正文与附件授权"
 };
 
 export function formatOutlookMonitorStatus(snapshot) {
@@ -38,16 +43,22 @@ export function formatOutlookMonitorStatus(snapshot) {
 export function monitorSetupChecklist(snapshot) {
   const config = snapshot?.config || {};
   const page = snapshot?.page || {};
-  const robotConfigured = Boolean(config.webhookConfigured && config.secretConfigured);
+  const richMode = config.deliveryMode === "rich";
+  const robotConfigured = richMode
+    ? Boolean(config.chatIdConfigured && config.outlookClientConfigured && config.outlookTenantConfigured)
+    : Boolean(config.webhookConfigured && config.secretConfigured);
+  const contentAuthorized = !richMode || Boolean(config.outlookGraphAuthorized);
   const testSucceeded = Boolean(config.testedAt);
   const rulesConfirmed = Boolean(config.rulesConfirmed);
   const outlookReady = Boolean(page.loggedIn && page.targetMailbox && page.targetFolder);
   return {
     robotConfigured,
+    richMode,
+    contentAuthorized,
     testSucceeded,
     rulesConfirmed,
     outlookReady,
-    readyToEnable: robotConfigured && testSucceeded && rulesConfirmed && outlookReady
+    readyToEnable: robotConfigured && contentAuthorized && testSucceeded && rulesConfirmed && outlookReady
   };
 }
 

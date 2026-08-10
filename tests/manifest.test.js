@@ -45,6 +45,8 @@ describe("extension manifest", () => {
     expect(manifest.permissions).toEqual(expect.arrayContaining(["storage", "alarms", "notifications"]));
     expect(manifest.host_permissions).toEqual(expect.arrayContaining([
       "https://partner.outlook.cn/*",
+      "https://login.chinacloudapi.cn/*",
+      "https://microsoftgraph.chinacloudapi.cn/*",
       "https://open.feishu.cn/*"
     ]));
     expect(manifest.content_scripts).toContainEqual(expect.objectContaining({

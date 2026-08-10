@@ -87,12 +87,15 @@ package struct NativeHostResponse: Codable, Equatable {
 package func handleNativeRequest(
     _ data: Data,
     exchanger: any TokenExchanging,
+    tenantTokenProvider: any TenantTokenProviding = TenantTokenProvider(),
     headingNumberer: any HeadingNumbering = UnavailableHeadingNumberer()
 ) async -> NativeHostResponse {
     do {
         switch try decodeNativeHostRequest(data) {
         case .exchange(let request):
             return .success(try await exchanger.exchange(request))
+        case .tenantToken(let request):
+            return .success(try await tenantTokenProvider.token(request))
         case .applyHeadingNumbering:
             try headingNumberer.apply()
             return .numberingSuccess()
@@ -106,12 +109,14 @@ package func runNativeHost(
     input: InputStream,
     output: OutputStream,
     exchanger: any TokenExchanging = TokenExchange(),
+    tenantTokenProvider: any TenantTokenProviding = TenantTokenProvider(),
     headingNumberer: any HeadingNumbering = UnavailableHeadingNumberer()
 ) async throws {
     guard let requestData = try NativeMessage.read(from: input) else { return }
     let response = await handleNativeRequest(
         requestData,
         exchanger: exchanger,
+        tenantTokenProvider: tenantTokenProvider,
         headingNumberer: headingNumberer
     )
     let responseData = try JSONEncoder().encode(response)

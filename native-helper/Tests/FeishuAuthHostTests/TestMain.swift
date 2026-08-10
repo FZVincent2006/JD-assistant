@@ -8,6 +8,7 @@ struct TestMain {
             var count = try runNativeMessageTests()
             count += try runKeychainSecretTests()
             count += try await runTokenExchangeTests()
+            count += try await runTenantTokenTests()
             count += try await runNativeHostTests()
             count += try runHeadingNumberingTests()
             count += try runCompanionBridgeTests()

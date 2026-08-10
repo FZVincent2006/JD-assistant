@@ -137,8 +137,13 @@ describe("createOutlookMonitorService", () => {
 
     expect(result.ok).toBe(true);
     expect(result.snapshot.config).toEqual({
+      deliveryMode: "webhook",
       webhookConfigured: true,
       secretConfigured: true,
+      chatIdConfigured: false,
+      outlookClientConfigured: false,
+      outlookTenantConfigured: false,
+      outlookGraphAuthorized: false,
       rulesConfirmed: true,
       testedAt: currentTime
     });
@@ -353,5 +358,86 @@ describe("createOutlookMonitorService", () => {
 
     expect(values[OUTLOOK_MONITOR_STORAGE_KEY].status).toBe("wrong_folder");
     expect(JSON.stringify(values[OUTLOOK_MONITOR_STORAGE_KEY])).not.toContain("private");
+  });
+
+  it("authorizes Outlook Graph and delivers body plus resume in rich mode", async () => {
+    const { chromeApi, values } = createChromeFake({
+      ok: true,
+      type: "OUTLOOK_SCAN_RESULT",
+      page: validPage,
+      mails: [candidateMail]
+    });
+    const graphAuth = {
+      authorize: vi.fn().mockResolvedValue({ status: "authorized" }),
+      clear: vi.fn()
+    };
+    const graphClient = {
+      loadMail: vi.fn().mockResolvedValue({
+        body: "Full candidate email body",
+        bodyTruncated: false,
+        attachments: [{
+          id: "attachment-1",
+          name: "Resume.pdf",
+          contentType: "application/pdf",
+          size: 3,
+          bytes: new Uint8Array([1, 2, 3])
+        }],
+        skippedAttachments: []
+      })
+    };
+    const richDelivery = {
+      sendTest: vi.fn().mockResolvedValue({ ok: true, code: 0 }),
+      sendStatus: vi.fn().mockResolvedValue({ ok: true, code: 0 }),
+      deliver: vi.fn().mockImplementation(async ({ onProgress }) => {
+        await onProgress(["card"]);
+        await onProgress(["card", "attachment:attachment-1"]);
+        return { ok: true };
+      })
+    };
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      graphAuth,
+      graphClient,
+      richDelivery
+    });
+
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SAVE_CONFIG",
+      payload: {
+        deliveryMode: "rich",
+        chatId: "oc_a676db7b8ae16f5ca23a9dd9b15ed3ca",
+        outlookClientId: "11111111-2222-4333-8444-555555555555",
+        outlookTenantId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        rulesConfirmed: true
+      }
+    });
+    await service.handleMessage({ type: "OUTLOOK_MONITOR_AUTHORIZE_GRAPH" });
+    await service.handleMessage({ type: "OUTLOOK_MONITOR_TEST_FEISHU" });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SET_ENABLED",
+      payload: { enabled: true }
+    });
+
+    currentTime += 60_000;
+    await service.handleMessage({
+      type: "OUTLOOK_SCAN_RESULT",
+      page: validPage,
+      mails: [newCandidateMail]
+    });
+
+    expect(graphAuth.authorize).toHaveBeenCalled();
+    expect(graphClient.loadMail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: newCandidateMail.subject
+    }));
+    expect(richDelivery.deliver).toHaveBeenCalledWith(expect.objectContaining({
+      chatId: "oc_a676db7b8ae16f5ca23a9dd9b15ed3ca",
+      detail: expect.objectContaining({ body: "Full candidate email body" })
+    }));
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].queue).toEqual([]);
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].status).toBe("monitoring");
+    expect(JSON.stringify(values[OUTLOOK_MONITOR_STORAGE_KEY]))
+      .not.toMatch(/Full candidate email body|Resume\.pdf|1,2,3/);
   });
 });

@@ -7,8 +7,24 @@ import {
   OUTLOOK_SCAN_ALARM,
   createOutlookMonitorService
 } from "./lib/outlookMonitorService.js";
+import { createOutlookGraphAuth } from "./lib/outlookGraphAuth.js";
+import { createOutlookGraphClient } from "./lib/outlookGraphClient.js";
+import { createFeishuRichMailDelivery } from "./lib/feishuRichMail.js";
+import { createFeishuTenantAuth } from "./background/feishuTenantAuth.js";
 
-const outlookMonitorService = createOutlookMonitorService({ chromeApi: chrome });
+const outlookGraphAuth = createOutlookGraphAuth({ chromeApi: chrome });
+const feishuTenantAuth = createFeishuTenantAuth({ chromeApi: chrome });
+const richDelivery = createFeishuRichMailDelivery({
+  getAccessToken: feishuTenantAuth.getAccessToken
+});
+const outlookMonitorService = createOutlookMonitorService({
+  chromeApi: chrome,
+  graphAuth: outlookGraphAuth,
+  graphClient: (config) => createOutlookGraphClient({
+    getAccessToken: () => outlookGraphAuth.getAccessToken(config)
+  }),
+  richDelivery
+});
 
 chrome.runtime.onInstalled.addListener(() => {
   if (chrome.sidePanel?.setPanelBehavior) {
