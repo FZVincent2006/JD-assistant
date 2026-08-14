@@ -40,7 +40,7 @@ describe("Codex colleague installer planning", () => {
     );
 
     expect(stdout).toContain("STATUS=planned");
-    expect(stdout).toContain("RELEASE_TAG=v0.2.7-codex.1");
+    expect(stdout).toContain("RELEASE_TAG=v0.3.16-codex.1");
     expect(stdout).toContain("BROWSER=chrome");
     expect(stdout).toContain("EXTENSION_ID=mlhjjkclfiocgafhjdhoicghiabkeggg");
     expect(stdout).toContain("Library/Application Support/ZhenFund JD Assistant/Extension");
