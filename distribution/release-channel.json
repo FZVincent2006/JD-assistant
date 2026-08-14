@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "repository": "FZVincent2006/JD-assistant",
-  "tag": "v0.2.7-codex.1",
-  "assetName": "JD-assistant-macOS-20260727.zip",
-  "assetUrl": "https://github.com/FZVincent2006/JD-assistant/releases/download/v0.2.7-codex.1/JD-assistant-macOS-20260727.zip",
-  "sha256": "6558364ffd761dba68aba67571f31f72111bc00afe4881d08a422549242732d1",
+  "tag": "v0.3.16-codex.1",
+  "assetName": "JD-assistant-macOS-20260814.zip",
+  "assetUrl": "https://github.com/FZVincent2006/JD-assistant/releases/download/v0.3.16-codex.1/JD-assistant-macOS-20260814.zip",
+  "sha256": "310ad60461a27f58c19714a8ba79ca7e4b8e112bd329a02e68729a5cd47ec03d",
   "extensionId": "mlhjjkclfiocgafhjdhoicghiabkeggg",
-  "extensionVersion": "0.2.7",
-  "buildCommit": "909ca8c28c3f15c47c4d78a0779dc9b2821ff9c9",
+  "extensionVersion": "0.3.16",
+  "buildCommit": "eb1354af442825e8289c9e88017e55400fad7263",
   "minimumMacOS": "13.0"
 }
