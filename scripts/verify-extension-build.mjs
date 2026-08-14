@@ -20,7 +20,7 @@ const allJavaScriptFiles = await listJavaScriptFiles(distUrl);
 const allJavaScript = (await Promise.all(
   allJavaScriptFiles.map((fileUrl) => readFile(fileUrl, "utf8"))
 )).join("\n");
-const requiredFeishuAppId = "cli_aade4224b8789bef";
+const requiredFeishuAppId = "cli_aaf06e1e3c385d1c";
 if (!allJavaScript.includes(requiredFeishuAppId)) {
   throw new Error(`dist JavaScript is missing the required public Feishu App ID: ${requiredFeishuAppId}`);
 }
@@ -28,7 +28,7 @@ const permissions = new Set(manifest.permissions ?? []);
 for (const forbidden of ["clipboardRead", "clipboardWrite", "debugger"]) {
   if (permissions.has(forbidden)) throw new Error(`dist manifest contains forbidden permission: ${forbidden}`);
 }
-for (const required of ["alarms", "identity", "storage", "nativeMessaging"]) {
+for (const required of ["alarms", "downloads", "identity", "storage", "nativeMessaging"]) {
   if (!permissions.has(required)) throw new Error(`dist manifest is missing permission: ${required}`);
 }
 
@@ -38,7 +38,10 @@ const approvedFeishuHosts = [
 ];
 const hostPermissionValues = manifest.host_permissions ?? [];
 const hostPermissions = new Set(hostPermissionValues);
-for (const required of [...approvedFeishuHosts, "https://partner.outlook.cn/*"]) {
+for (const required of [
+  ...approvedFeishuHosts,
+  "https://partner.outlook.cn/*"
+]) {
   if (!hostPermissions.has(required)) throw new Error(`dist manifest is missing host permission: ${required}`);
 }
 const feishuHosts = hostPermissionValues.filter((host) => host.includes("feishu.cn"));
@@ -88,7 +91,10 @@ for (const messageType of [
 for (const messageType of [
   "OUTLOOK_MONITOR_GET",
   "OUTLOOK_MONITOR_SAVE_CONFIG",
-  "OUTLOOK_MONITOR_SET_ENABLED"
+  "OUTLOOK_MONITOR_SET_ENABLED",
+  "OUTLOOK_READ_MAIL_DETAIL",
+  "OUTLOOK_TRIGGER_ATTACHMENT_DOWNLOAD",
+  "GET_TENANT_TOKEN"
 ]) {
   if (!background.includes(messageType)) throw new Error(`dist background is missing ${messageType}`);
 }

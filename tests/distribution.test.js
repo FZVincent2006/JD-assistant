@@ -69,6 +69,6 @@ describe("colleague distribution entry", () => {
     expect(verifier).toContain("RTWjwVZjri4uCUk0J8wcn2K3n6d");
     expect(verifier).toContain("LlhrwSLIvilANZk1opwcQGlUnNv");
     expect(verifier).toContain("contains the retired test document");
-    expect(buildVerifier).toContain("cli_aade4224b8789bef");
+    expect(buildVerifier).toContain("cli_aaf06e1e3c385d1c");
   });
 });

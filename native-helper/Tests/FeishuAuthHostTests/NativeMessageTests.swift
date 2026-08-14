@@ -31,11 +31,38 @@ func runNativeMessageTests() throws -> Int {
     let written = output.property(forKey: .dataWrittenToMemoryStreamKey) as? Data
     try expect(written == frame(unicode), "write Unicode JSON with little-endian prefix")
 
+    let inputURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("native-message-input-\(UUID().uuidString)")
+    let outputURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("native-message-output-\(UUID().uuidString)")
+    defer {
+        try? FileManager.default.removeItem(at: inputURL)
+        try? FileManager.default.removeItem(at: outputURL)
+    }
+    try frame(unicode).write(to: inputURL)
+    FileManager.default.createFile(atPath: outputURL.path, contents: nil)
+    let inputHandle = try FileHandle(forReadingFrom: inputURL)
+    let outputHandle = try FileHandle(forWritingTo: outputURL)
+    defer {
+        try? inputHandle.close()
+        try? outputHandle.close()
+    }
+    try expect(
+        try NativeMessage.read(from: inputHandle) == unicode,
+        "read framed JSON from a native file handle"
+    )
+    try NativeMessage.write(unicode, to: outputHandle)
+    try outputHandle.synchronize()
+    try expect(
+        try Data(contentsOf: outputURL) == frame(unicode),
+        "write framed JSON to a native file handle"
+    )
+
     try NativeMessage.validateLength(1_048_576)
     try expectThrows("reject more than one MiB") {
         try NativeMessage.validateLength(1_048_577)
     }
-    return 7
+    return 9
 }
 
 private func frame(_ body: Data) -> Data {

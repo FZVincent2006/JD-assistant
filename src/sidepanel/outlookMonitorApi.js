@@ -18,6 +18,10 @@ export function rebaselineOutlookMonitor(confirmed, chromeApi = chrome) {
   return sendOutlookMonitorRequest("OUTLOOK_MONITOR_REBASELINE", { confirmed }, chromeApi);
 }
 
+export function replayLatestOutlookMail(chromeApi = chrome) {
+  return sendOutlookMonitorRequest("OUTLOOK_MONITOR_REPLAY_LATEST", undefined, chromeApi);
+}
+
 export async function sendOutlookMonitorRequest(type, payload, chromeApi = chrome) {
   try {
     return await chromeApi.runtime.sendMessage(

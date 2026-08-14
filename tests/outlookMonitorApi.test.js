@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getOutlookMonitorStatus,
   rebaselineOutlookMonitor,
+  replayLatestOutlookMail,
   saveOutlookMonitorConfig,
   setOutlookMonitorEnabled,
   testOutlookMonitorFeishu
@@ -28,6 +29,7 @@ describe("Outlook monitor side-panel API", () => {
     await testOutlookMonitorFeishu(chromeApi);
     await setOutlookMonitorEnabled(true, chromeApi);
     await rebaselineOutlookMonitor(true, chromeApi);
+    await replayLatestOutlookMail(chromeApi);
 
     expect(chromeApi.runtime.sendMessage.mock.calls).toEqual([
       [{ type: "OUTLOOK_MONITOR_GET" }],
@@ -41,7 +43,8 @@ describe("Outlook monitor side-panel API", () => {
       }],
       [{ type: "OUTLOOK_MONITOR_TEST_FEISHU" }],
       [{ type: "OUTLOOK_MONITOR_SET_ENABLED", payload: { enabled: true } }],
-      [{ type: "OUTLOOK_MONITOR_REBASELINE", payload: { confirmed: true } }]
+      [{ type: "OUTLOOK_MONITOR_REBASELINE", payload: { confirmed: true } }],
+      [{ type: "OUTLOOK_MONITOR_REPLAY_LATEST" }]
     ]);
   });
 

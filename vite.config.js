@@ -1,13 +1,14 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { applyFeishuAuthMode } from "./src/lib/manifestAuthMode.js";
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const authMode = env.VITE_FEISHU_AUTH_MODE || "pkce";
   return {
-    plugins: [react(), manifestAuthModePlugin(authMode)],
+    plugins: [react(), ...(command === "build" ? [manifestAuthModePlugin(authMode)] : [])],
     build: {
       rollupOptions: {
         input: {
@@ -30,12 +31,20 @@ export default defineConfig(({ mode }) => {
 });
 
 function manifestAuthModePlugin(authMode) {
+  let root = process.cwd();
+  let outDir = "dist";
   return {
     name: "feishu-auth-mode-manifest",
+    configResolved(config) {
+      root = config.root;
+      outDir = config.build.outDir;
+    },
     async closeBundle() {
-      const manifestUrl = new URL("./dist/manifest.json", import.meta.url);
-      const manifest = JSON.parse(await readFile(manifestUrl, "utf8"));
-      await writeFile(manifestUrl, `${JSON.stringify(applyFeishuAuthMode(manifest, authMode), null, 2)}\n`);
+      const outputPath = resolve(root, outDir, "manifest.json");
+      const sourcePath = resolve(root, "public", "manifest.json");
+      const manifest = JSON.parse(await readFile(sourcePath, "utf8"));
+      await mkdir(resolve(root, outDir), { recursive: true });
+      await writeFile(outputPath, `${JSON.stringify(applyFeishuAuthMode(manifest, authMode), null, 2)}\n`);
     }
   };
 }

@@ -1,6 +1,6 @@
 export const PRODUCTION_FEISHU_DOC_URL = "https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d";
 export const PRODUCTION_FEISHU_WIKI_TOKEN = "RTWjwVZjri4uCUk0J8wcn2K3n6d";
-export const DEFAULT_FEISHU_APP_ID = "cli_aade4224b8789bef";
+export const DEFAULT_FEISHU_APP_ID = "cli_aaf06e1e3c385d1c";
 export const FEISHU_APP_ID = String(
   import.meta.env?.VITE_FEISHU_APP_ID ?? DEFAULT_FEISHU_APP_ID
 ).trim() || DEFAULT_FEISHU_APP_ID;

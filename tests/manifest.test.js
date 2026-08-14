@@ -3,8 +3,8 @@ import manifest from "../public/manifest.json";
 import { applyFeishuAuthMode } from "../src/lib/manifestAuthMode.js";
 
 describe("extension manifest", () => {
-  it("identifies the partial-safe Portfolio job-anchor release version", () => {
-    expect(manifest.version).toBe("0.2.7");
+  it("identifies the Outlook rich-mail reminder release version", () => {
+    expect(manifest.version).toBe("0.3.16");
   });
 
   it("uses Feishu API permissions without injecting a script into Feishu pages", () => {
@@ -42,11 +42,14 @@ describe("extension manifest", () => {
   });
 
   it("wires a dedicated China Outlook monitor with local-only state permissions", () => {
-    expect(manifest.permissions).toEqual(expect.arrayContaining(["storage", "alarms", "notifications"]));
+    expect(manifest.permissions).toEqual(expect.arrayContaining([
+      "storage", "alarms", "notifications", "downloads"
+    ]));
     expect(manifest.host_permissions).toEqual(expect.arrayContaining([
       "https://partner.outlook.cn/*",
       "https://open.feishu.cn/*"
     ]));
+    expect(manifest.host_permissions.some((host) => host.includes("microsoftgraph"))).toBe(false);
     expect(manifest.content_scripts).toContainEqual(expect.objectContaining({
       matches: ["https://partner.outlook.cn/mail/*"],
       js: ["outlook.js"],

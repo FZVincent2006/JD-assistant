@@ -14,6 +14,7 @@ import {
 import {
   getOutlookMonitorStatus,
   rebaselineOutlookMonitor,
+  replayLatestOutlookMail,
   saveOutlookMonitorConfig,
   setOutlookMonitorEnabled,
   testOutlookMonitorFeishu
@@ -29,6 +30,8 @@ export default function OutlookMonitorPanel() {
   const [snapshot, setSnapshot] = useState(null);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [secret, setSecret] = useState("");
+  const [deliveryMode, setDeliveryMode] = useState("webhook");
+  const [chatId, setChatId] = useState("");
   const [rulesConfirmed, setRulesConfirmed] = useState(false);
   const [message, setMessage] = useState("正在读取监控状态…");
   const [busy, setBusy] = useState(false);
@@ -44,13 +47,14 @@ export default function OutlookMonitorPanel() {
   }
 
   function applyResult(result, successMessage) {
+    if (result?.snapshot) {
+      setSnapshot(result.snapshot);
+      setRulesConfirmed(Boolean(result.snapshot.config?.rulesConfirmed));
+      setDeliveryMode(result.snapshot.config?.deliveryMode || "webhook");
+    }
     if (!result?.ok) {
       setMessage(result?.error || "操作失败，请稍后重试。");
       return false;
-    }
-    if (result.snapshot) {
-      setSnapshot(result.snapshot);
-      setRulesConfirmed(Boolean(result.snapshot.config?.rulesConfirmed));
     }
     setMessage(successMessage);
     return true;
@@ -68,12 +72,19 @@ export default function OutlookMonitorPanel() {
 
   async function saveConfig() {
     const saved = await run(
-      () => saveOutlookMonitorConfig({ webhookUrl, secret, rulesConfirmed }),
+      () => saveOutlookMonitorConfig({
+        deliveryMode,
+        webhookUrl,
+        secret,
+        chatId,
+        rulesConfirmed
+      }),
       "机器人配置已保存在这台电脑的 Chrome 中。"
     );
     if (saved) {
       setWebhookUrl("");
       setSecret("");
+      setChatId("");
     }
   }
 
@@ -104,6 +115,20 @@ export default function OutlookMonitorPanel() {
       () => rebaselineOutlookMonitor(true),
       "基线已重新建立。"
     );
+  }
+
+  async function replayLatest() {
+    if (!window.confirm("将重新读取并推送当前文件夹最上方的一封邮件，可能产生重复提醒。确认继续？")) return;
+    setBusy(true);
+    try {
+      const result = await replayLatestOutlookMail();
+      applyResult(
+        result,
+        result?.message || "最近一封邮件已重新推送到当前配置的飞书群。"
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   const events = [...(snapshot?.events || [])].reverse();
@@ -147,24 +172,53 @@ export default function OutlookMonitorPanel() {
           <Bot size={17} />
           <h3>四人群机器人</h3>
         </div>
-        <label htmlFor="outlook-webhook">Webhook</label>
-        <input
-          id="outlook-webhook"
-          type="password"
-          autoComplete="off"
-          placeholder={snapshot?.config?.webhookConfigured ? "已配置；留空表示不更换" : "https://open.feishu.cn/open-apis/bot/v2/hook/..."}
-          value={webhookUrl}
-          onChange={(event) => setWebhookUrl(event.target.value)}
-        />
-        <label htmlFor="outlook-secret">签名密钥</label>
-        <input
-          id="outlook-secret"
-          type="password"
-          autoComplete="off"
-          placeholder={snapshot?.config?.secretConfigured ? "已配置；留空表示不更换" : "粘贴机器人安全设置中的签名密钥"}
-          value={secret}
-          onChange={(event) => setSecret(event.target.value)}
-        />
+        <label htmlFor="outlook-delivery-mode">提醒内容</label>
+        <select
+          id="outlook-delivery-mode"
+          value={deliveryMode}
+          onChange={(event) => setDeliveryMode(event.target.value)}
+        >
+          <option value="rich">正文 + 简历附件（推荐）</option>
+          <option value="webhook">仅主题提醒（兼容模式）</option>
+        </select>
+        {deliveryMode === "rich" ? (
+          <>
+            <label htmlFor="outlook-chat-id">飞书群 ID</label>
+            <input
+              id="outlook-chat-id"
+              type="text"
+              autoComplete="off"
+              placeholder={snapshot?.config?.chatIdConfigured ? "已配置；留空表示不更换" : "oc_..."}
+              value={chatId}
+              onChange={(event) => setChatId(event.target.value)}
+            />
+            <p className="fieldHint">
+              扩展直接读取已登录的 Outlook 页面。新邮件处理时页面会短暂打开对应邮件，
+              并可能将邮件标记为已读；无需 Microsoft 或公司 IT 额外授权。
+            </p>
+          </>
+        ) : (
+          <>
+            <label htmlFor="outlook-webhook">Webhook</label>
+            <input
+              id="outlook-webhook"
+              type="password"
+              autoComplete="off"
+              placeholder={snapshot?.config?.webhookConfigured ? "已配置；留空表示不更换" : "https://open.feishu.cn/open-apis/bot/v2/hook/..."}
+              value={webhookUrl}
+              onChange={(event) => setWebhookUrl(event.target.value)}
+            />
+            <label htmlFor="outlook-secret">签名密钥</label>
+            <input
+              id="outlook-secret"
+              type="password"
+              autoComplete="off"
+              placeholder={snapshot?.config?.secretConfigured ? "已配置；留空表示不更换" : "粘贴机器人安全设置中的签名密钥"}
+              value={secret}
+              onChange={(event) => setSecret(event.target.value)}
+            />
+          </>
+        )}
         <label className="checkRow">
           <input
             type="checkbox"
@@ -190,8 +244,14 @@ export default function OutlookMonitorPanel() {
 
       <section className="panel monitorChecklist">
         <h3>开启检查</h3>
-        <ChecklistItem ok={checklist.robotConfigured} text="机器人 Webhook 和签名已保存" />
-        <ChecklistItem ok={checklist.testSucceeded} text="四人群测试提醒已成功" />
+        <ChecklistItem
+          ok={checklist.robotConfigured}
+          text={checklist.richMode ? "飞书群 ID 已保存" : "机器人 Webhook 和签名已保存"}
+        />
+        <ChecklistItem
+          ok={checklist.richMode || checklist.testSucceeded}
+          text={checklist.richMode ? "测试提醒可跳过（可按需发送）" : "四人群测试提醒已成功"}
+        />
         <ChecklistItem ok={checklist.rulesConfirmed} text="四个平台分流规则已确认" />
         <ChecklistItem ok={checklist.outlookReady} text="目标邮箱和提醒文件夹已打开" />
         {!snapshot?.enabled ? (
@@ -227,6 +287,15 @@ export default function OutlookMonitorPanel() {
           </button>
           <button className="secondary" type="button" onClick={rebuildBaseline} disabled={busy}>
             重新建立基线
+          </button>
+          <button
+            className="secondary"
+            type="button"
+            onClick={replayLatest}
+            disabled={busy || !checklist.richMode || !checklist.robotConfigured}
+          >
+            <Send size={15} />
+            重推最近一封
           </button>
         </div>
       </section>

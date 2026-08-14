@@ -8,7 +8,7 @@ import {
 
 describe("production Feishu document target", () => {
   it("always includes the public Feishu app id required to start authorization", () => {
-    expect(FEISHU_APP_ID).toBe("cli_aade4224b8789bef");
+    expect(FEISHU_APP_ID).toBe("cli_aaf06e1e3c385d1c");
   });
 
   it("allows only the fixed production wiki document", () => {
