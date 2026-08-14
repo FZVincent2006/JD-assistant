@@ -49,14 +49,11 @@ describe("monitorSetupChecklist", () => {
     });
   });
 
-  it("requires Outlook content authorization in rich delivery mode", () => {
+  it("requires only the app-bot chat ID in rich GUI delivery mode", () => {
     expect(monitorSetupChecklist({
       config: {
         deliveryMode: "rich",
         chatIdConfigured: true,
-        outlookClientConfigured: true,
-        outlookTenantConfigured: true,
-        outlookGraphAuthorized: false,
         rulesConfirmed: true,
         testedAt: 123
       },
@@ -64,8 +61,23 @@ describe("monitorSetupChecklist", () => {
     })).toMatchObject({
       robotConfigured: true,
       richMode: true,
-      contentAuthorized: false,
-      readyToEnable: false
+      contentAuthorized: true,
+      readyToEnable: true
+    });
+  });
+
+  it("allows rich delivery to start without posting a test message", () => {
+    expect(monitorSetupChecklist({
+      config: {
+        deliveryMode: "rich",
+        chatIdConfigured: true,
+        rulesConfirmed: true,
+        testedAt: null
+      },
+      page: { targetMailbox: true, targetFolder: true, loggedIn: true }
+    })).toMatchObject({
+      testSucceeded: false,
+      readyToEnable: true
     });
   });
 });

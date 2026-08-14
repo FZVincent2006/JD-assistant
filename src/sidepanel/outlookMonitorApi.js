@@ -10,20 +10,16 @@ export function testOutlookMonitorFeishu(chromeApi = chrome) {
   return sendOutlookMonitorRequest("OUTLOOK_MONITOR_TEST_FEISHU", undefined, chromeApi);
 }
 
-export function authorizeOutlookGraph(chromeApi = chrome) {
-  return sendOutlookMonitorRequest("OUTLOOK_MONITOR_AUTHORIZE_GRAPH", undefined, chromeApi);
-}
-
-export function clearOutlookGraphAuthorization(chromeApi = chrome) {
-  return sendOutlookMonitorRequest("OUTLOOK_MONITOR_CLEAR_GRAPH", undefined, chromeApi);
-}
-
 export function setOutlookMonitorEnabled(enabled, chromeApi = chrome) {
   return sendOutlookMonitorRequest("OUTLOOK_MONITOR_SET_ENABLED", { enabled }, chromeApi);
 }
 
 export function rebaselineOutlookMonitor(confirmed, chromeApi = chrome) {
   return sendOutlookMonitorRequest("OUTLOOK_MONITOR_REBASELINE", { confirmed }, chromeApi);
+}
+
+export function replayLatestOutlookMail(chromeApi = chrome) {
+  return sendOutlookMonitorRequest("OUTLOOK_MONITOR_REPLAY_LATEST", undefined, chromeApi);
 }
 
 export async function sendOutlookMonitorRequest(type, payload, chromeApi = chrome) {

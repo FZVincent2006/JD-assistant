@@ -1,6 +1,6 @@
 import Foundation
 
-package let allowedFeishuAppId = "cli_aade4224b8789bef"
+package let allowedFeishuAppId = "cli_aaf06e1e3c385d1c"
 
 package struct ExchangeCodeRequest: Codable, Equatable {
     package let type: String

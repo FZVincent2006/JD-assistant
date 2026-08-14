@@ -12,10 +12,9 @@ import {
   Send
 } from "lucide-react";
 import {
-  authorizeOutlookGraph,
-  clearOutlookGraphAuthorization,
   getOutlookMonitorStatus,
   rebaselineOutlookMonitor,
+  replayLatestOutlookMail,
   saveOutlookMonitorConfig,
   setOutlookMonitorEnabled,
   testOutlookMonitorFeishu
@@ -33,8 +32,6 @@ export default function OutlookMonitorPanel() {
   const [secret, setSecret] = useState("");
   const [deliveryMode, setDeliveryMode] = useState("webhook");
   const [chatId, setChatId] = useState("");
-  const [outlookClientId, setOutlookClientId] = useState("");
-  const [outlookTenantId, setOutlookTenantId] = useState("");
   const [rulesConfirmed, setRulesConfirmed] = useState(false);
   const [message, setMessage] = useState("正在读取监控状态…");
   const [busy, setBusy] = useState(false);
@@ -50,14 +47,14 @@ export default function OutlookMonitorPanel() {
   }
 
   function applyResult(result, successMessage) {
-    if (!result?.ok) {
-      setMessage(result?.error || "操作失败，请稍后重试。");
-      return false;
-    }
-    if (result.snapshot) {
+    if (result?.snapshot) {
       setSnapshot(result.snapshot);
       setRulesConfirmed(Boolean(result.snapshot.config?.rulesConfirmed));
       setDeliveryMode(result.snapshot.config?.deliveryMode || "webhook");
+    }
+    if (!result?.ok) {
+      setMessage(result?.error || "操作失败，请稍后重试。");
+      return false;
     }
     setMessage(successMessage);
     return true;
@@ -80,8 +77,6 @@ export default function OutlookMonitorPanel() {
         webhookUrl,
         secret,
         chatId,
-        outlookClientId,
-        outlookTenantId,
         rulesConfirmed
       }),
       "机器人配置已保存在这台电脑的 Chrome 中。"
@@ -90,8 +85,6 @@ export default function OutlookMonitorPanel() {
       setWebhookUrl("");
       setSecret("");
       setChatId("");
-      setOutlookClientId("");
-      setOutlookTenantId("");
     }
   }
 
@@ -99,20 +92,6 @@ export default function OutlookMonitorPanel() {
     await run(
       () => testOutlookMonitorFeishu(),
       "测试提醒已发送，请在四人群中确认。"
-    );
-  }
-
-  async function connectOutlookContent() {
-    await run(
-      () => authorizeOutlookGraph(),
-      "已授权读取新邮件正文和简历附件。"
-    );
-  }
-
-  async function disconnectOutlookContent() {
-    await run(
-      () => clearOutlookGraphAuthorization(),
-      "已清除 Outlook 正文与附件授权。"
     );
   }
 
@@ -136,6 +115,20 @@ export default function OutlookMonitorPanel() {
       () => rebaselineOutlookMonitor(true),
       "基线已重新建立。"
     );
+  }
+
+  async function replayLatest() {
+    if (!window.confirm("将重新读取并推送当前文件夹最上方的一封邮件，可能产生重复提醒。确认继续？")) return;
+    setBusy(true);
+    try {
+      const result = await replayLatestOutlookMail();
+      applyResult(
+        result,
+        result?.message || "最近一封邮件已重新推送到当前配置的飞书群。"
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   const events = [...(snapshot?.events || [])].reverse();
@@ -199,26 +192,9 @@ export default function OutlookMonitorPanel() {
               value={chatId}
               onChange={(event) => setChatId(event.target.value)}
             />
-            <label htmlFor="outlook-client-id">Outlook 应用 Client ID</label>
-            <input
-              id="outlook-client-id"
-              type="text"
-              autoComplete="off"
-              placeholder={snapshot?.config?.outlookClientConfigured ? "已配置；留空表示不更换" : "Azure 中国应用的 Client ID"}
-              value={outlookClientId}
-              onChange={(event) => setOutlookClientId(event.target.value)}
-            />
-            <label htmlFor="outlook-tenant-id">Outlook Tenant ID</label>
-            <input
-              id="outlook-tenant-id"
-              type="text"
-              autoComplete="off"
-              placeholder={snapshot?.config?.outlookTenantConfigured ? "已配置；留空表示不更换" : "Azure 中国租户 ID"}
-              value={outlookTenantId}
-              onChange={(event) => setOutlookTenantId(event.target.value)}
-            />
             <p className="fieldHint">
-              需要在 Azure 中国为本扩展登记应用，并授权 Mail.Read 和 Mail.Read.Shared。
+              扩展直接读取已登录的 Outlook 页面。新邮件处理时页面会短暂打开对应邮件，
+              并可能将邮件标记为已读；无需 Microsoft 或公司 IT 额外授权。
             </p>
           </>
         ) : (
@@ -255,22 +231,6 @@ export default function OutlookMonitorPanel() {
           <Save size={16} />
           保存机器人配置
         </button>
-        {deliveryMode === "rich" && (
-          snapshot?.config?.outlookGraphAuthorized ? (
-            <button className="secondary" type="button" onClick={disconnectOutlookContent} disabled={busy}>
-              取消 Outlook 正文授权
-            </button>
-          ) : (
-            <button
-              className="secondary"
-              type="button"
-              onClick={connectOutlookContent}
-              disabled={busy || !snapshot?.config?.outlookClientConfigured || !snapshot?.config?.outlookTenantConfigured}
-            >
-              授权读取正文和附件
-            </button>
-          )
-        )}
         <button
           className="secondary"
           type="button"
@@ -286,12 +246,12 @@ export default function OutlookMonitorPanel() {
         <h3>开启检查</h3>
         <ChecklistItem
           ok={checklist.robotConfigured}
-          text={checklist.richMode ? "群 ID 和 Outlook 应用信息已保存" : "机器人 Webhook 和签名已保存"}
+          text={checklist.richMode ? "飞书群 ID 已保存" : "机器人 Webhook 和签名已保存"}
         />
-        {checklist.richMode && (
-          <ChecklistItem ok={checklist.contentAuthorized} text="已授权读取邮件正文和简历附件" />
-        )}
-        <ChecklistItem ok={checklist.testSucceeded} text="四人群测试提醒已成功" />
+        <ChecklistItem
+          ok={checklist.richMode || checklist.testSucceeded}
+          text={checklist.richMode ? "测试提醒可跳过（可按需发送）" : "四人群测试提醒已成功"}
+        />
         <ChecklistItem ok={checklist.rulesConfirmed} text="四个平台分流规则已确认" />
         <ChecklistItem ok={checklist.outlookReady} text="目标邮箱和提醒文件夹已打开" />
         {!snapshot?.enabled ? (
@@ -327,6 +287,15 @@ export default function OutlookMonitorPanel() {
           </button>
           <button className="secondary" type="button" onClick={rebuildBaseline} disabled={busy}>
             重新建立基线
+          </button>
+          <button
+            className="secondary"
+            type="button"
+            onClick={replayLatest}
+            disabled={busy || !checklist.richMode || !checklist.robotConfigured}
+          >
+            <Send size={15} />
+            重推最近一封
           </button>
         </div>
       </section>

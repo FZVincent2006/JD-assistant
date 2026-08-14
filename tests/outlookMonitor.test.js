@@ -173,6 +173,45 @@ describe("getOutlookPageState", () => {
     });
   });
 
+  it("recognizes the open folder from the message-list heading when the folder tree is collapsed", () => {
+    renderOutlook();
+    document.querySelector('[role="treeitem"]').remove();
+    document.body.insertAdjacentHTML("afterbegin", `
+      <div role="heading"><span title="个人投递（需提醒）">个人投递（需提…</span></div>
+    `);
+
+    expect(getOutlookPageState(document, OUTLOOK_URL)).toMatchObject({
+      folder: "个人投递（需提醒）",
+      targetFolder: true
+    });
+  });
+
+  it("keeps the verified recruiting mailbox ready when the compact shell hides the account label", () => {
+    renderOutlook();
+    document.querySelector('a[href*="username="]').remove();
+
+    expect(getOutlookPageState(document, OUTLOOK_URL)).toMatchObject({
+      mailbox: "recruiting@zhenfund.com",
+      loggedIn: true,
+      targetMailbox: true,
+      targetFolder: true
+    });
+  });
+
+  it("does not treat an unselected target folder in the navigation tree as open", () => {
+    renderOutlook({ folder: "收件箱" });
+    document.body.insertAdjacentHTML("afterbegin", `
+      <div role="treeitem" aria-selected="false" title="个人投递（需提醒）">
+        个人投递（需提醒）
+      </div>
+    `);
+
+    expect(getOutlookPageState(document, OUTLOOK_URL)).toMatchObject({
+      folder: "收件箱",
+      targetFolder: false
+    });
+  });
+
   it("rejects a different mailbox and unsupported origin", () => {
     renderOutlook({ mailbox: "other@example.com", folder: "Inbox" });
 
@@ -260,5 +299,75 @@ describe("startOutlookMonitor", () => {
 
     expect(setTimer).toHaveBeenLastCalledWith(expect.any(Function), 3000);
     expect(clearTimer).toHaveBeenCalledWith(9);
+  });
+
+  it("schedules an immediate scan when the browser resumes or regains focus", () => {
+    renderOutlook();
+    const setTimer = vi.fn(() => 10);
+    const chromeApi = {
+      runtime: {
+        onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+        sendMessage: vi.fn()
+      }
+    };
+    const stop = startOutlookMonitor({
+      root: document,
+      url: OUTLOOK_URL,
+      chromeApi,
+      createObserver: () => ({ observe: vi.fn(), disconnect: vi.fn() }),
+      setTimer,
+      clearTimer: vi.fn()
+    });
+
+    window.dispatchEvent(new Event("focus"));
+    expect(setTimer).toHaveBeenLastCalledWith(expect.any(Function), 250);
+    stop();
+  });
+
+  it("opens the exact new-mail row and returns the rendered body to the background", async () => {
+    renderOutlook();
+    document.querySelector('[data-convid="conv-1"]').addEventListener("click", () => {
+      document.body.insertAdjacentHTML("beforeend", `
+        <section data-app-section="MailReadCompose">
+          <h1 role="heading">Investment internship application</h1>
+          <div id="UniqueMessageBody_1">Visible candidate body</div>
+        </section>
+      `);
+    });
+    let listener;
+    const chromeApi = {
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((candidate) => {
+            listener = candidate;
+          }),
+          removeListener: vi.fn()
+        },
+        sendMessage: vi.fn()
+      }
+    };
+    startOutlookMonitor({
+      root: document,
+      url: OUTLOOK_URL,
+      chromeApi,
+      createObserver: () => ({ observe: vi.fn(), disconnect: vi.fn() }),
+      setTimer: () => 1,
+      clearTimer: vi.fn()
+    });
+    const sendResponse = vi.fn();
+
+    expect(listener({
+      type: "OUTLOOK_READ_MAIL_DETAIL",
+      mail: {
+        conversationId: "conv-1",
+        subject: "Investment internship application"
+      }
+    }, {}, sendResponse)).toBe(true);
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({
+        ok: true,
+        detail: expect.objectContaining({ body: "Visible candidate body" })
+      });
+    });
   });
 });

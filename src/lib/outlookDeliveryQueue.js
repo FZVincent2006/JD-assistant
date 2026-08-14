@@ -78,6 +78,7 @@ export function deliveryBatchesFor(jobs) {
 
 function sanitizeMail(mail) {
   return {
+    conversationId: sanitize(mail?.conversationId, 180),
     senderName: sanitize(mail?.senderName, 120),
     senderEmail: sanitize(mail?.senderEmail, 254),
     subject: sanitize(mail?.subject, 240),

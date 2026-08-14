@@ -53,4 +53,22 @@ describe("Feishu tenant authorization", () => {
       stage: "feishu-tenant-token"
     });
   });
+
+  it("does not reuse a cached token from a different Feishu app", async () => {
+    const { chromeApi, values } = chromeFake();
+    values.feishuTenantAuthSessionV1 = {
+      appId: "cli_oldapp1234",
+      accessToken: "old-token",
+      expiresAt: 7_201_000
+    };
+    const auth = createFeishuTenantAuth({
+      chromeApi,
+      appId: "cli_aaf06e1e3c385d1c",
+      now: () => 1_000
+    });
+
+    await expect(auth.getAccessToken()).resolves.toBe("tenant-token");
+    expect(chromeApi.runtime.sendNativeMessage).toHaveBeenCalledTimes(1);
+    expect(values.feishuTenantAuthSessionV1.appId).toBe("cli_aaf06e1e3c385d1c");
+  });
 });

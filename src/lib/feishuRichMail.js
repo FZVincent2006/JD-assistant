@@ -25,15 +25,22 @@ export function createFeishuRichMailDelivery({ fetchImpl = fetch, getAccessToken
   }) {
     requireChatId(chatId);
     const completed = new Set(completedParts || []);
+    const preparedAttachments = [];
+    for (const attachment of detail?.attachments || []) {
+      const part = `attachment:${String(attachment.id || "").slice(0, 512)}`;
+      if (completed.has(part)) continue;
+      preparedAttachments.push({
+        attachment,
+        part,
+        fileKey: await uploadAttachment(attachment)
+      });
+    }
     if (!completed.has("card")) {
       await sendMessage(chatId, "interactive", buildRichMailCard(mail, detail), uuidFor(mail, "card"));
       completed.add("card");
       await onProgress([...completed]);
     }
-    for (const attachment of detail?.attachments || []) {
-      const part = `attachment:${String(attachment.id || "").slice(0, 512)}`;
-      if (completed.has(part)) continue;
-      const fileKey = await uploadAttachment(attachment);
+    for (const { part, fileKey } of preparedAttachments) {
       await sendMessage(chatId, "file", { file_key: fileKey }, uuidFor(mail, part));
       completed.add(part);
       await onProgress([...completed]);
@@ -43,9 +50,16 @@ export function createFeishuRichMailDelivery({ fetchImpl = fetch, getAccessToken
 
   async function sendTest(chatId) {
     requireChatId(chatId);
+    const testAttachment = {
+      name: "简历附件推送测试.txt",
+      contentType: "text/plain; charset=utf-8",
+      bytes: new TextEncoder().encode("招聘 JD 发布助手：附件上传与群文件发送测试成功。\n")
+    };
+    const fileKey = await uploadAttachment(testAttachment);
+    await sendMessage(chatId, "file", { file_key: fileKey });
     await sendMessage(chatId, "interactive", statusCard(
       "完整邮件提醒测试成功",
-      "机器人已具备向本群发送邮件正文和简历附件的能力。",
+      "机器人已具备向本群发送邮件正文和简历附件的能力；上方测试文件可以直接下载。",
       "green"
     ));
     return { ok: true, code: 0, message: "success" };
@@ -199,7 +213,11 @@ function escapeLarkMarkdown(value) {
 
 function skipReason(reason) {
   if (reason === "total-size") return "附件总大小超过 60 MB";
-  return "仅支持 30 MB 以内的 PDF、DOC、DOCX";
+  if (reason === "no-download-url") return "Outlook 页面未提供安全下载入口";
+  if (reason === "processing") return "附件处理中，系统将继续重试";
+  if (reason === "download-failed") return "附件下载失败，系统将继续重试";
+  if (reason === "control-not-found") return "附件控件暂未识别，系统将继续重试";
+  return "仅支持 30 MB 以内的 PDF、DOC、DOCX、PNG、JPG、WebP";
 }
 
 function uuidFor(mail, part) {

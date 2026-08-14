@@ -52,16 +52,10 @@ struct FeishuAuthHostMain {
         }
 
         guard acceptsNativeHostLaunchArguments(arguments) else { exit(2) }
-        guard
-            let input = InputStream(fileAtPath: "/dev/stdin"),
-            let output = OutputStream(toFileAtPath: "/dev/stdout", append: false)
-        else {
-            exit(1)
-        }
         do {
             try await runNativeHost(
-                input: input,
-                output: output,
+                input: FileHandle.standardInput,
+                output: FileHandle.standardOutput,
                 headingNumberer: CompanionHeadingNumberer()
             )
         } catch {

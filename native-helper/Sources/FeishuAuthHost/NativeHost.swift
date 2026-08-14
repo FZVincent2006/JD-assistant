@@ -18,6 +18,10 @@ package struct NativeHostResponse: Codable, Equatable {
     package let message: String?
     package let logId: String?
     package let reason: String?
+    package let fileChunkBase64: String?
+    package let fileSize: Int?
+    package let eof: Bool?
+    package let downloadedFiles: [DownloadedFileInfo]?
 
     fileprivate static func success(_ result: TokenResult) -> Self {
         Self(
@@ -28,7 +32,11 @@ package struct NativeHostResponse: Codable, Equatable {
             errorCode: nil,
             message: nil,
             logId: nil,
-            reason: nil
+            reason: nil,
+            fileChunkBase64: nil,
+            fileSize: nil,
+            eof: nil,
+            downloadedFiles: nil
         )
     }
 
@@ -41,7 +49,29 @@ package struct NativeHostResponse: Codable, Equatable {
             errorCode: nil,
             message: nil,
             logId: nil,
-            reason: nil
+            reason: nil,
+            fileChunkBase64: nil,
+            fileSize: nil,
+            eof: nil,
+            downloadedFiles: nil
+        )
+    }
+
+    fileprivate static func fileChunk(_ chunk: DownloadedFileChunk) -> Self {
+        Self(
+            ok: true, accessToken: nil, expiresIn: nil, scope: nil,
+            errorCode: nil, message: nil, logId: nil, reason: nil,
+            fileChunkBase64: chunk.base64, fileSize: chunk.fileSize, eof: chunk.eof,
+            downloadedFiles: nil
+        )
+    }
+
+    fileprivate static func downloadedFiles(_ files: [DownloadedFileInfo]) -> Self {
+        Self(
+            ok: true, accessToken: nil, expiresIn: nil, scope: nil,
+            errorCode: nil, message: nil, logId: nil, reason: nil,
+            fileChunkBase64: nil, fileSize: nil, eof: nil,
+            downloadedFiles: files
         )
     }
 
@@ -59,7 +89,11 @@ package struct NativeHostResponse: Codable, Equatable {
             errorCode: errorCode,
             message: message,
             logId: logId.isEmpty ? nil : logId,
-            reason: reason
+            reason: reason,
+            fileChunkBase64: nil,
+            fileSize: nil,
+            eof: nil,
+            downloadedFiles: nil
         )
     }
 
@@ -88,7 +122,8 @@ package func handleNativeRequest(
     _ data: Data,
     exchanger: any TokenExchanging,
     tenantTokenProvider: any TenantTokenProviding = TenantTokenProvider(),
-    headingNumberer: any HeadingNumbering = UnavailableHeadingNumberer()
+    headingNumberer: any HeadingNumbering = UnavailableHeadingNumberer(),
+    downloadedFileReader: any DownloadedFileReading = DownloadedFileReader()
 ) async -> NativeHostResponse {
     do {
         switch try decodeNativeHostRequest(data) {
@@ -98,6 +133,13 @@ package func handleNativeRequest(
             return .success(try await tenantTokenProvider.token(request))
         case .applyHeadingNumbering:
             try headingNumberer.apply()
+            return .numberingSuccess()
+        case .readDownloadedFileChunk(let request):
+            return .fileChunk(try downloadedFileReader.read(request))
+        case .listRecentDownloadedFiles(let request):
+            return .downloadedFiles(try downloadedFileReader.recent(request))
+        case .deleteDownloadedFile(let request):
+            try downloadedFileReader.delete(request)
             return .numberingSuccess()
         }
     } catch {
@@ -110,14 +152,36 @@ package func runNativeHost(
     output: OutputStream,
     exchanger: any TokenExchanging = TokenExchange(),
     tenantTokenProvider: any TenantTokenProviding = TenantTokenProvider(),
-    headingNumberer: any HeadingNumbering = UnavailableHeadingNumberer()
+    headingNumberer: any HeadingNumbering = UnavailableHeadingNumberer(),
+    downloadedFileReader: any DownloadedFileReading = DownloadedFileReader()
 ) async throws {
     guard let requestData = try NativeMessage.read(from: input) else { return }
     let response = await handleNativeRequest(
         requestData,
         exchanger: exchanger,
         tenantTokenProvider: tenantTokenProvider,
-        headingNumberer: headingNumberer
+        headingNumberer: headingNumberer,
+        downloadedFileReader: downloadedFileReader
+    )
+    let responseData = try JSONEncoder().encode(response)
+    try NativeMessage.write(responseData, to: output)
+}
+
+package func runNativeHost(
+    input: FileHandle,
+    output: FileHandle,
+    exchanger: any TokenExchanging = TokenExchange(),
+    tenantTokenProvider: any TenantTokenProviding = TenantTokenProvider(),
+    headingNumberer: any HeadingNumbering = UnavailableHeadingNumberer(),
+    downloadedFileReader: any DownloadedFileReading = DownloadedFileReader()
+) async throws {
+    guard let requestData = try NativeMessage.read(from: input) else { return }
+    let response = await handleNativeRequest(
+        requestData,
+        exchanger: exchanger,
+        tenantTokenProvider: tenantTokenProvider,
+        headingNumberer: headingNumberer,
+        downloadedFileReader: downloadedFileReader
     )
     let responseData = try JSONEncoder().encode(response)
     try NativeMessage.write(responseData, to: output)

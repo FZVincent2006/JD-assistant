@@ -29,6 +29,7 @@ describe("outlook delivery queue", () => {
       id: "hash-1",
       dedupeKeys: ["hash-1"],
       mails: [{
+        conversationId: "conv",
         senderName: "Candidate",
         senderEmail: "candidate@example.com",
         subject: "Investment internship application",
@@ -41,7 +42,7 @@ describe("outlook delivery queue", () => {
       status: "pending",
       lastErrorCode: ""
     }]);
-    expect(JSON.stringify(queue)).not.toMatch(/must not persist|must-not-persist\.pdf|conversationId/);
+    expect(JSON.stringify(queue)).not.toMatch(/must not persist|must-not-persist\.pdf/);
   });
 
   it("does not enqueue the same dedupe key twice", () => {

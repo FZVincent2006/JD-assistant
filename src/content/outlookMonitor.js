@@ -1,3 +1,8 @@
+import {
+  readOutlookMailViaGui,
+  triggerOutlookAttachmentDownload
+} from "./outlookMailDetail.js";
+
 const TARGET_ORIGIN = "https://partner.outlook.cn";
 const TARGET_MAILBOX = "recruiting@zhenfund.com";
 const TARGET_FOLDER = "个人投递（需提醒）";
@@ -14,8 +19,13 @@ export function extractOutlookMailRows(root = document) {
 
 export function getOutlookPageState(root = document, url = location.href) {
   const supported = isSupportedOutlookUrl(url);
-  const mailbox = findMailbox(root);
+  const detectedMailbox = findMailbox(root);
   const folder = findSelectedFolder(root);
+  const visibleMailRows = root.querySelectorAll('[role="option"][data-convid]').length > 0;
+  const inferredTargetMailbox = !detectedMailbox
+    && folder === TARGET_FOLDER
+    && visibleMailRows;
+  const mailbox = detectedMailbox || (inferredTargetMailbox ? TARGET_MAILBOX : "");
   const loggedIn = supported && Boolean(mailbox);
 
   return {
@@ -37,6 +47,7 @@ export function startOutlookMonitor({
   clearTimer = clearTimeout
 } = {}) {
   let scanTimer = null;
+  let detailReadInProgress = false;
 
   const buildScanResult = (reason) => ({
     ok: true,
@@ -62,23 +73,74 @@ export function startOutlookMonitor({
   };
 
   const messageListener = (message, _sender, sendResponse) => {
-    if (message?.type !== "OUTLOOK_SCAN_REQUEST") return false;
-    sendResponse(buildScanResult(message.reason || "request"));
+    if (message?.type === "OUTLOOK_SCAN_REQUEST") {
+      sendResponse(buildScanResult(message.reason || "request"));
+      return false;
+    }
+    if (message?.type === "OUTLOOK_READ_MAIL_DETAIL") {
+      detailReadInProgress = true;
+      readOutlookMailViaGui({ root, mail: message.mail })
+        .then((detail) => sendResponse({ ok: true, detail }))
+        .catch((error) => sendResponse({
+          ok: false,
+          error: "无法从 Outlook 页面读取该邮件。",
+          stage: error?.stage || "outlook-gui-detail"
+        }))
+        .finally(() => {
+          detailReadInProgress = false;
+        });
+      return true;
+    }
+    if (message?.type === "OUTLOOK_TRIGGER_ATTACHMENT_DOWNLOAD") {
+      detailReadInProgress = true;
+      triggerOutlookAttachmentDownload({
+        root,
+        mail: message.mail,
+        name: message.name
+      })
+        .then((result) => sendResponse(result))
+        .catch((error) => sendResponse({
+          ok: false,
+          error: "无法触发 Outlook 附件下载。",
+          stage: error?.stage || "outlook-gui-attachment-download-action"
+        }))
+        .finally(() => {
+          detailReadInProgress = false;
+        });
+      return true;
+    }
     return false;
   };
 
   chromeApi.runtime.onMessage.addListener(messageListener);
-  const observer = createObserver(() => scheduleScan("mutation", 3000));
+  const observer = createObserver(() => {
+    if (!detailReadInProgress) scheduleScan("mutation", 3000);
+  });
   observer.observe(root.body ?? root.documentElement, {
     childList: true,
     subtree: true
   });
+  const scanOnResume = () => {
+    if (!detailReadInProgress) scheduleScan("resume", 250);
+  };
+  root.addEventListener?.("visibilitychange", scanOnResume);
+  root.defaultView?.addEventListener?.("focus", scanOnResume);
+  root.defaultView?.addEventListener?.("pageshow", scanOnResume);
+  root.defaultView?.addEventListener?.("online", scanOnResume);
   scheduleScan("page_load", 0);
 
   return () => {
     if (scanTimer != null) clearTimer(scanTimer);
     observer.disconnect();
-    chromeApi.runtime.onMessage.removeListener(messageListener);
+    root.removeEventListener?.("visibilitychange", scanOnResume);
+    root.defaultView?.removeEventListener?.("focus", scanOnResume);
+    root.defaultView?.removeEventListener?.("pageshow", scanOnResume);
+    root.defaultView?.removeEventListener?.("online", scanOnResume);
+    try {
+      chromeApi.runtime.onMessage.removeListener(messageListener);
+    } catch {
+      // The previous extension context can already be invalid after an update.
+    }
   };
 }
 
@@ -160,14 +222,38 @@ function findMailbox(root) {
 
 function findSelectedFolder(root) {
   const selected = root.querySelector(
-    '[role="treeitem"][aria-selected="true"], [role="treeitem"][data-is-selected="true"]'
+    '[role="treeitem"][aria-selected="true"], [role="treeitem"][data-is-selected="true"], [role="treeitem"][aria-current="page"]'
   );
   const folderName = sanitize(selected?.getAttribute("data-folder-name"), 120);
   if (folderName) return folderName;
 
   const visibleText = sanitize(selected?.textContent, 120);
   if (visibleText.includes(TARGET_FOLDER)) return TARGET_FOLDER;
-  return visibleText.replace(/\s*\d+\s*未读.*$/u, "").replace(/\s*已选择.*$/u, "");
+  const selectedText = visibleText.replace(/\s*\d+\s*未读.*$/u, "").replace(/\s*已选择.*$/u, "");
+
+  // New Outlook layouts can collapse the folder tree and expose the open
+  // folder only in the message-list heading. Do not accept a matching label
+  // from an unselected tree item, because the user may have another folder open.
+  const headingCandidates = root.querySelectorAll(
+    '[role="heading"], h1, h2, h3, [data-folder-name], [title], [aria-label]'
+  );
+  for (const candidate of headingCandidates) {
+    const treeItem = candidate.closest?.('[role="treeitem"]');
+    if (treeItem && treeItem.getAttribute("aria-selected") !== "true"
+      && treeItem.getAttribute("data-is-selected") !== "true"
+      && treeItem.getAttribute("aria-current") !== "page") continue;
+    if (candidate.closest?.('[hidden], [aria-hidden="true"]')) continue;
+    const labels = [
+      candidate.getAttribute?.("data-folder-name"),
+      candidate.getAttribute?.("title"),
+      candidate.getAttribute?.("aria-label"),
+      candidate.textContent
+    ];
+    if (labels.some((value) => sanitize(value, 120).includes(TARGET_FOLDER))) return TARGET_FOLDER;
+  }
+
+  if (sanitize(root.title, 240).includes(TARGET_FOLDER)) return TARGET_FOLDER;
+  return selectedText;
 }
 
 function findLiveSender(row) {
@@ -245,12 +331,21 @@ function isSupportedOutlookUrl(url) {
   }
 }
 
+const outlookMonitorScriptVersion = typeof chrome !== "undefined"
+  ? chrome.runtime?.getManifest?.().version || "development"
+  : "development";
+
 if (
   typeof chrome !== "undefined" &&
   typeof document !== "undefined" &&
   isSupportedOutlookUrl(globalThis.location?.href) &&
-  !globalThis.__recruitingAssistantOutlookMonitorLoaded
+  globalThis.__recruitingAssistantOutlookMonitorVersion !== outlookMonitorScriptVersion
 ) {
-  globalThis.__recruitingAssistantOutlookMonitorLoaded = true;
-  startOutlookMonitor();
+  try {
+    globalThis.__recruitingAssistantOutlookMonitorCleanup?.();
+  } catch {
+    // Ignore cleanup from an invalidated extension context.
+  }
+  globalThis.__recruitingAssistantOutlookMonitorVersion = outlookMonitorScriptVersion;
+  globalThis.__recruitingAssistantOutlookMonitorCleanup = startOutlookMonitor();
 }

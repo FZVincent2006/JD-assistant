@@ -27,6 +27,31 @@ final class SpyHeadingNumberer: HeadingNumbering, @unchecked Sendable {
     }
 }
 
+final class SpyDownloadedFileReader: DownloadedFileReading, @unchecked Sendable {
+    var readCalls = 0
+    var recentCalls = 0
+    var deleteCalls = 0
+
+    func read(_ request: DownloadedFileChunkRequest) throws -> DownloadedFileChunk {
+        readCalls += 1
+        return DownloadedFileChunk(base64: "JVBERi0=", fileSize: 5, eof: true)
+    }
+
+    func delete(_ request: DownloadedFileDeleteRequest) throws {
+        deleteCalls += 1
+    }
+
+    func recent(_ request: DownloadedFileSearchRequest) throws -> [DownloadedFileInfo] {
+        recentCalls += 1
+        return [DownloadedFileInfo(
+            path: "/Users/test/Downloads/Candidate.pdf",
+            name: "Candidate.pdf",
+            size: 505_856,
+            modifiedAtMs: request.sinceMs + 1_000
+        )]
+    }
+}
+
 func runNativeHostTests() async throws -> Int {
     try expect(
         acceptsNativeHostLaunchArguments([]),
@@ -106,6 +131,33 @@ func runNativeHostTests() async throws -> Int {
     try expect(!injected.ok, "native host rejects executable numbering fields")
     try expect(numberer.calls == 1, "rejected numbering fields never reach the numberer")
 
+    let downloadedFileReader = SpyDownloadedFileReader()
+    let fileChunk = await handleNativeRequest(
+        Data(#"{"type":"READ_DOWNLOADED_FILE_CHUNK","path":"/Users/test/Downloads/Candidate.pdf","offset":0,"length":393216,"expectedName":"Candidate.pdf","expectedSize":505856}"#.utf8),
+        exchanger: StubTokenExchanger(result: TokenResult(accessToken: "unused", expiresIn: 1, scope: "")),
+        downloadedFileReader: downloadedFileReader
+    )
+    try expect(fileChunk.ok && fileChunk.fileChunkBase64 == "JVBERi0=", "native host returns a file chunk")
+    try expect(downloadedFileReader.readCalls == 1, "native host routes the file chunk request")
+
+    let recentFiles = await handleNativeRequest(
+        Data(#"{"type":"LIST_RECENT_DOWNLOADED_FILES","sinceMs":1786592163246,"untilMs":1786593963246}"#.utf8),
+        exchanger: StubTokenExchanger(result: TokenResult(accessToken: "unused", expiresIn: 1, scope: "")),
+        downloadedFileReader: downloadedFileReader
+    )
+    try expect(
+        recentFiles.ok && recentFiles.downloadedFiles?.first?.name == "Candidate.pdf",
+        "native host returns recent validated downloads"
+    )
+    try expect(downloadedFileReader.recentCalls == 1, "native host routes recent download search")
+
+    let cleanup = await handleNativeRequest(
+        Data(#"{"type":"DELETE_DOWNLOADED_FILE","path":"/Users/test/Downloads/Candidate.pdf"}"#.utf8),
+        exchanger: StubTokenExchanger(result: TokenResult(accessToken: "unused", expiresIn: 1, scope: "")),
+        downloadedFileReader: downloadedFileReader
+    )
+    try expect(cleanup.ok && downloadedFileReader.deleteCalls == 1, "native host routes file cleanup")
+
     let exchangeWithExtraField = try JSONSerialization.data(withJSONObject: [
         "type": "EXCHANGE_CODE",
         "appId": "cli_test1234",
@@ -120,5 +172,5 @@ func runNativeHostTests() async throws -> Int {
         headingNumberer: numberer
     )
     try expect(!rejectedExchange.ok, "native host rejects extra exchange fields")
-    return 14
+    return 20
 }

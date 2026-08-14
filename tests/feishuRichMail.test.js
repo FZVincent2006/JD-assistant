@@ -46,10 +46,10 @@ describe("Feishu rich recruiting mail", () => {
     expect(text).not.toContain("1,2,3");
   });
 
-  it("uploads each resume and sends it as a file after the body card", async () => {
+  it("uploads each resume before publishing the body card, then sends the file", async () => {
     const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({ code: 0, msg: "success", data: { message_id: "om-card" } }))
       .mockResolvedValueOnce(jsonResponse({ code: 0, msg: "success", data: { file_key: "file-key" } }))
+      .mockResolvedValueOnce(jsonResponse({ code: 0, msg: "success", data: { message_id: "om-card" } }))
       .mockResolvedValueOnce(jsonResponse({ code: 0, msg: "success", data: { message_id: "om-file" } }));
     const delivery = createFeishuRichMailDelivery({
       fetchImpl,
@@ -68,9 +68,9 @@ describe("Feishu rich recruiting mail", () => {
     expect(result.ok).toBe(true);
     expect(result.completedParts).toEqual(["card", "attachment:attachment-1"]);
     expect(progressUpdates).toEqual([["card"], ["card", "attachment:attachment-1"]]);
-    expect(String(fetchImpl.mock.calls[0][0])).toContain("/open-apis/im/v1/messages");
-    expect(String(fetchImpl.mock.calls[1][0])).toContain("/open-apis/im/v1/files");
-    expect(fetchImpl.mock.calls[1][1].body).toBeInstanceOf(FormData);
+    expect(String(fetchImpl.mock.calls[0][0])).toContain("/open-apis/im/v1/files");
+    expect(fetchImpl.mock.calls[0][1].body).toBeInstanceOf(FormData);
+    expect(String(fetchImpl.mock.calls[1][0])).toContain("/open-apis/im/v1/messages");
     const fileMessage = JSON.parse(fetchImpl.mock.calls[2][1].body);
     expect(fileMessage).toMatchObject({
       receive_id: chatId,
@@ -99,6 +99,31 @@ describe("Feishu rich recruiting mail", () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("tests both file upload and file delivery before reporting success", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, data: { file_key: "test-file-key" } }))
+      .mockResolvedValueOnce(jsonResponse({ code: 0, data: { message_id: "om-test-file" } }))
+      .mockResolvedValueOnce(jsonResponse({ code: 0, data: { message_id: "om-test-card" } }));
+    const delivery = createFeishuRichMailDelivery({
+      fetchImpl,
+      getAccessToken: vi.fn().mockResolvedValue("tenant-token")
+    });
+
+    const result = await delivery.sendTest(chatId);
+
+    expect(result.ok).toBe(true);
+    expect(String(fetchImpl.mock.calls[0][0])).toContain("/open-apis/im/v1/files");
+    expect(fetchImpl.mock.calls[0][1].body).toBeInstanceOf(FormData);
+    const fileMessage = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(fileMessage).toMatchObject({
+      receive_id: chatId,
+      msg_type: "file",
+      content: "{\"file_key\":\"test-file-key\"}"
+    });
+    const statusMessage = JSON.parse(fetchImpl.mock.calls[2][1].body);
+    expect(statusMessage.msg_type).toBe("interactive");
   });
 
   it("accepts only Feishu chat identifiers", () => {

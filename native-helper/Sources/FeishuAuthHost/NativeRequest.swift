@@ -4,6 +4,9 @@ package enum NativeHostRequest {
     case exchange(ExchangeCodeRequest)
     case tenantToken(TenantTokenRequest)
     case applyHeadingNumbering
+    case readDownloadedFileChunk(DownloadedFileChunkRequest)
+    case listRecentDownloadedFiles(DownloadedFileSearchRequest)
+    case deleteDownloadedFile(DownloadedFileDeleteRequest)
 }
 
 package func decodeNativeHostRequest(_ data: Data) throws -> NativeHostRequest {
@@ -41,6 +44,31 @@ package func decodeNativeHostRequest(_ data: Data) throws -> NativeHostRequest {
             throw TokenExchangeError(message: "Invalid native numbering request")
         }
         return .applyHeadingNumbering
+    case "READ_DOWNLOADED_FILE_CHUNK":
+        let allowed = Set(["type", "path", "offset", "length", "expectedName", "expectedSize"])
+        guard Set(object.keys) == allowed else {
+            throw TokenExchangeError(message: "Invalid downloaded file request")
+        }
+        return .readDownloadedFileChunk(try JSONDecoder().decode(
+            DownloadedFileChunkRequest.self,
+            from: data
+        ))
+    case "LIST_RECENT_DOWNLOADED_FILES":
+        guard Set(object.keys) == Set(["type", "sinceMs", "untilMs"]) else {
+            throw TokenExchangeError(message: "Invalid downloaded file search request")
+        }
+        return .listRecentDownloadedFiles(try JSONDecoder().decode(
+            DownloadedFileSearchRequest.self,
+            from: data
+        ))
+    case "DELETE_DOWNLOADED_FILE":
+        guard Set(object.keys) == Set(["type", "path"]) else {
+            throw TokenExchangeError(message: "Invalid downloaded file cleanup request")
+        }
+        return .deleteDownloadedFile(try JSONDecoder().decode(
+            DownloadedFileDeleteRequest.self,
+            from: data
+        ))
     default:
         throw TokenExchangeError(message: "Unsupported native request type")
     }

@@ -7,30 +7,37 @@ import {
   OUTLOOK_SCAN_ALARM,
   createOutlookMonitorService
 } from "./lib/outlookMonitorService.js";
-import { createOutlookGraphAuth } from "./lib/outlookGraphAuth.js";
-import { createOutlookGraphClient } from "./lib/outlookGraphClient.js";
+import { createOutlookGuiClient } from "./lib/outlookGuiClient.js";
 import { createFeishuRichMailDelivery } from "./lib/feishuRichMail.js";
 import { createFeishuTenantAuth } from "./background/feishuTenantAuth.js";
+import { createDownloadedFileReader } from "./background/downloadedFileReader.js";
+import { createOutlookPageBridge } from "./lib/outlookPageBridge.js";
 
-const outlookGraphAuth = createOutlookGraphAuth({ chromeApi: chrome });
 const feishuTenantAuth = createFeishuTenantAuth({ chromeApi: chrome });
+const outlookPageBridge = createOutlookPageBridge({ chromeApi: chrome });
 const richDelivery = createFeishuRichMailDelivery({
   getAccessToken: feishuTenantAuth.getAccessToken
 });
 const outlookMonitorService = createOutlookMonitorService({
   chromeApi: chrome,
-  graphAuth: outlookGraphAuth,
-  graphClient: (config) => createOutlookGraphClient({
-    getAccessToken: () => outlookGraphAuth.getAccessToken(config)
+  pageBridge: outlookPageBridge,
+  guiClient: createOutlookGuiClient({
+    chromeApi: chrome,
+    pageBridge: outlookPageBridge,
+    downloadedFileReader: createDownloadedFileReader({ chromeApi: chrome })
   }),
   richDelivery
 });
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   if (chrome.sidePanel?.setPanelBehavior) {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
   }
-  outlookMonitorService.initialize();
+  outlookMonitorService.initialize()
+    .then(() => details?.reason === "update"
+      ? outlookMonitorService.retryPendingNow()
+      : null)
+    .catch(() => {});
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -40,6 +47,14 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm?.name !== OUTLOOK_SCAN_ALARM && alarm?.name !== OUTLOOK_RETRY_ALARM) return;
   outlookMonitorService.handleAlarm(alarm);
+});
+
+chrome.tabs.onActivated?.addListener(() => {
+  outlookMonitorService.handleAlarm({ name: OUTLOOK_SCAN_ALARM });
+});
+
+chrome.windows?.onFocusChanged?.addListener(() => {
+  outlookMonitorService.handleAlarm({ name: OUTLOOK_SCAN_ALARM });
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

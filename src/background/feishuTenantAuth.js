@@ -19,7 +19,7 @@ export function createFeishuTenantAuth({
 } = {}) {
   async function getAccessToken() {
     const stored = (await chromeApi.storage.session.get(SESSION_KEY))?.[SESSION_KEY];
-    if (stored?.accessToken && stored.expiresAt - now() > EXPIRY_SAFETY_MS) {
+    if (stored?.appId === appId && stored?.accessToken && stored.expiresAt - now() > EXPIRY_SAFETY_MS) {
       return stored.accessToken;
     }
     const result = await requestNativeToken();
@@ -29,6 +29,7 @@ export function createFeishuTenantAuth({
       });
     }
     const next = {
+      appId,
       accessToken: result.accessToken,
       expiresAt: now() + Number(result.expiresIn) * 1000
     };

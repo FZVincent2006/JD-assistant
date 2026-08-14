@@ -2,7 +2,7 @@
 set -euo pipefail
 
 HOST_NAME="cn.zhenfund.jd_assistant.feishu_auth"
-APP_ID="cli_aade4224b8789bef"
+APP_ID="cli_aaf06e1e3c385d1c"
 KEYCHAIN_SERVICE="cn.zhenfund.jd-assistant.feishu"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -107,6 +107,7 @@ fi
 mkdir -p "$INSTALL_DIR" "$(dirname "$CHROME_MANIFEST")" "$(dirname "$EDGE_MANIFEST")"
 rm -rf "$INSTALL_APP"
 ditto "$SOURCE_APP" "$INSTALL_APP"
+/usr/bin/xattr -cr "$INSTALL_APP"
 rm -f "$LEGACY_BINARY"
 printf '%s\n' "$MANIFEST_JSON" > "$CHROME_MANIFEST"
 printf '%s\n' "$MANIFEST_JSON" > "$EDGE_MANIFEST"

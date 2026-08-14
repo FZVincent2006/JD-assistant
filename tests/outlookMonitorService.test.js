@@ -90,6 +90,36 @@ describe("createOutlookMonitorService", () => {
     );
   });
 
+  it("retries queued mail immediately after an extension update", async () => {
+    const { chromeApi, values } = createChromeFake();
+    const sendWebhook = vi.fn().mockResolvedValue({ ok: true, code: 0, message: "success" });
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      sendWebhook
+    });
+    await configureAndTest(service);
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SET_ENABLED",
+      payload: { enabled: true }
+    });
+    values[OUTLOOK_MONITOR_STORAGE_KEY].queue = [{
+      id: "queued-before-update",
+      dedupeKeys: ["queued-before-update"],
+      mails: [{ ...candidateMail, hasAttachment: false }],
+      attempts: 3,
+      createdAt: currentTime,
+      nextAttemptAt: currentTime + 30 * 60_000,
+      status: "pending"
+    }];
+
+    await service.retryPendingNow();
+
+    expect(sendWebhook).toHaveBeenCalledTimes(2);
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].queue).toEqual([]);
+  });
+
   it("requires a successful bot test and confirmed rules before enabling", async () => {
     const { chromeApi } = createChromeFake();
     const service = createOutlookMonitorService({
@@ -115,12 +145,99 @@ describe("createOutlookMonitorService", () => {
 
     expect(missingConfig).toEqual({
       ok: false,
-      error: expect.stringContaining("测试提醒")
+      error: expect.stringContaining("机器人配置")
     });
     expect(unconfirmed).toEqual({
       ok: false,
       error: expect.stringContaining("四个平台")
     });
+  });
+
+  it("pauses monitoring when the destination group changes but allows rich mode to restart silently", async () => {
+    const { chromeApi } = createChromeFake();
+    const richDelivery = {
+      sendTest: vi.fn().mockResolvedValue({ ok: true, code: 0 }),
+      deliver: vi.fn().mockResolvedValue({ ok: true })
+    };
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      guiClient: { loadMail: vi.fn() },
+      richDelivery
+    });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SAVE_CONFIG",
+      payload: {
+        deliveryMode: "rich",
+        chatId: "oc_30c3295e3b77a970817952be0fffa7ee",
+        rulesConfirmed: true
+      }
+    });
+    await service.handleMessage({ type: "OUTLOOK_MONITOR_TEST_FEISHU" });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SET_ENABLED",
+      payload: { enabled: true }
+    });
+
+    const result = await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SAVE_CONFIG",
+      payload: { chatId: "oc_a676db7b8ae16f5ca23a9dd9b15ed3ca" }
+    });
+
+    expect(result.snapshot.enabled).toBe(false);
+    expect(result.snapshot.config.testedAt).toBeNull();
+    expect(result.snapshot.status).toBe("ready");
+
+    const restarted = await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SET_ENABLED",
+      payload: { enabled: true }
+    });
+    expect(restarted.ok).toBe(true);
+    expect(richDelivery.sendTest).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops manual replay work when silently enabling the new destination", async () => {
+    const { chromeApi, values } = createChromeFake();
+    const richDelivery = {
+      sendTest: vi.fn().mockResolvedValue({ ok: true, code: 0 }),
+      deliver: vi.fn().mockResolvedValue({ ok: true })
+    };
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      guiClient: { loadMail: vi.fn() },
+      richDelivery
+    });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SAVE_CONFIG",
+      payload: {
+        deliveryMode: "rich",
+        chatId: "oc_a676db7b8ae16f5ca23a9dd9b15ed3ca",
+        rulesConfirmed: true
+      }
+    });
+    values[OUTLOOK_MONITOR_STORAGE_KEY].queue = [{
+      id: "manual-replay-old-mail",
+      dedupeKeys: ["manual-replay-old-mail"],
+      mails: [candidateMail],
+      attempts: 1,
+      createdAt: currentTime,
+      nextAttemptAt: currentTime,
+      status: "pending",
+      completedParts: []
+    }];
+
+    const result = await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SET_ENABLED",
+      payload: { enabled: true }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].queue).toEqual([]);
+    expect(richDelivery.sendTest).not.toHaveBeenCalled();
+    expect(richDelivery.deliver).not.toHaveBeenCalled();
   });
 
   it("redacts webhook and secret from every public status response", async () => {
@@ -141,9 +258,6 @@ describe("createOutlookMonitorService", () => {
       webhookConfigured: true,
       secretConfigured: true,
       chatIdConfigured: false,
-      outlookClientConfigured: false,
-      outlookTenantConfigured: false,
-      outlookGraphAuthorized: false,
       rulesConfirmed: true,
       testedAt: currentTime
     });
@@ -360,18 +474,14 @@ describe("createOutlookMonitorService", () => {
     expect(JSON.stringify(values[OUTLOOK_MONITOR_STORAGE_KEY])).not.toContain("private");
   });
 
-  it("authorizes Outlook Graph and delivers body plus resume in rich mode", async () => {
+  it("reads the Outlook GUI and delivers body plus resume in rich mode", async () => {
     const { chromeApi, values } = createChromeFake({
       ok: true,
       type: "OUTLOOK_SCAN_RESULT",
       page: validPage,
       mails: [candidateMail]
     });
-    const graphAuth = {
-      authorize: vi.fn().mockResolvedValue({ status: "authorized" }),
-      clear: vi.fn()
-    };
-    const graphClient = {
+    const guiClient = {
       loadMail: vi.fn().mockResolvedValue({
         body: "Full candidate email body",
         bodyTruncated: false,
@@ -398,8 +508,7 @@ describe("createOutlookMonitorService", () => {
       chromeApi,
       cryptoApi: webcrypto,
       now: () => currentTime,
-      graphAuth,
-      graphClient,
+      guiClient,
       richDelivery
     });
 
@@ -408,12 +517,9 @@ describe("createOutlookMonitorService", () => {
       payload: {
         deliveryMode: "rich",
         chatId: "oc_a676db7b8ae16f5ca23a9dd9b15ed3ca",
-        outlookClientId: "11111111-2222-4333-8444-555555555555",
-        outlookTenantId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
         rulesConfirmed: true
       }
     });
-    await service.handleMessage({ type: "OUTLOOK_MONITOR_AUTHORIZE_GRAPH" });
     await service.handleMessage({ type: "OUTLOOK_MONITOR_TEST_FEISHU" });
     await service.handleMessage({
       type: "OUTLOOK_MONITOR_SET_ENABLED",
@@ -427,8 +533,8 @@ describe("createOutlookMonitorService", () => {
       mails: [newCandidateMail]
     });
 
-    expect(graphAuth.authorize).toHaveBeenCalled();
-    expect(graphClient.loadMail).toHaveBeenCalledWith(expect.objectContaining({
+    expect(guiClient.loadMail).toHaveBeenCalledWith(expect.objectContaining({
+      conversationId: newCandidateMail.conversationId,
       subject: newCandidateMail.subject
     }));
     expect(richDelivery.deliver).toHaveBeenCalledWith(expect.objectContaining({
@@ -439,5 +545,318 @@ describe("createOutlookMonitorService", () => {
     expect(values[OUTLOOK_MONITOR_STORAGE_KEY].status).toBe("monitoring");
     expect(JSON.stringify(values[OUTLOOK_MONITOR_STORAGE_KEY]))
       .not.toMatch(/Full candidate email body|Resume\.pdf|1,2,3/);
+  });
+
+  it("waits for the attachment before sending the complete mail reminder", async () => {
+    const { chromeApi, values } = createChromeFake({
+      ok: true,
+      type: "OUTLOOK_SCAN_RESULT",
+      page: validPage,
+      mails: [candidateMail]
+    });
+    const guiClient = {
+      loadMail: vi.fn()
+        .mockResolvedValueOnce({
+          body: "Candidate body",
+          attachments: [],
+          skippedAttachments: [{
+            name: "Candidate.pdf",
+            reason: "download-failed",
+            stage: "outlook-browser-download-timeout"
+          }],
+          retryableAttachmentFailure: true
+        })
+        .mockResolvedValueOnce({
+          body: "Candidate body",
+          attachments: [{
+            id: "resume",
+            name: "Candidate.pdf",
+            contentType: "application/pdf",
+            bytes: new Uint8Array([1, 2, 3])
+          }],
+          skippedAttachments: [],
+          retryableAttachmentFailure: false
+        })
+    };
+    const richDelivery = {
+      sendTest: vi.fn().mockResolvedValue({ ok: true, code: 0 }),
+      deliver: vi.fn().mockImplementation(async ({ completedParts, onProgress }) => {
+        if (!completedParts.includes("card")) await onProgress(["card"]);
+        else await onProgress([...completedParts, "attachment:resume"]);
+        return { ok: true };
+      })
+    };
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      guiClient,
+      richDelivery
+    });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SAVE_CONFIG",
+      payload: {
+        deliveryMode: "rich",
+        chatId: "oc_30c3295e3b77a970817952be0fffa7ee",
+        rulesConfirmed: true
+      }
+    });
+    await service.handleMessage({ type: "OUTLOOK_MONITOR_TEST_FEISHU" });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SET_ENABLED",
+      payload: { enabled: true }
+    });
+
+    currentTime += 60_000;
+    await service.handleMessage({
+      type: "OUTLOOK_SCAN_RESULT",
+      page: validPage,
+      mails: [newCandidateMail]
+    });
+
+    let stored = values[OUTLOOK_MONITOR_STORAGE_KEY];
+    expect(richDelivery.deliver).not.toHaveBeenCalled();
+    expect(stored.status).toBe("attachment_retrying");
+    expect(stored.queue[0]).toMatchObject({
+      attempts: 1,
+      lastErrorCode: "outlook-browser-download-timeout"
+    });
+    expect(stored.events.at(-1).code).toBe("attachment_retry_scheduled");
+
+    chromeApi.tabs.sendMessage.mockResolvedValue({
+      ok: true,
+      type: "OUTLOOK_SCAN_RESULT",
+      page: validPage,
+      mails: [newCandidateMail]
+    });
+    const [retryResult, concurrentRetryResult] = await Promise.all([
+      service.handleMessage({ type: "OUTLOOK_MONITOR_REPLAY_LATEST" }),
+      service.handleMessage({ type: "OUTLOOK_MONITOR_REPLAY_LATEST" })
+    ]);
+
+    stored = values[OUTLOOK_MONITOR_STORAGE_KEY];
+    expect(retryResult).toMatchObject({ ok: true, partial: false });
+    expect(concurrentRetryResult).toMatchObject({ ok: true, partial: false });
+    expect(guiClient.loadMail).toHaveBeenCalledTimes(2);
+    expect(richDelivery.deliver).toHaveBeenCalledTimes(1);
+    expect(richDelivery.deliver.mock.calls[0][0].completedParts).toEqual([]);
+    expect(guiClient.loadMail.mock.calls[1][0]).toMatchObject({
+      reuseRecentAttachmentDownload: true
+    });
+    expect(stored.queue).toEqual([]);
+    expect(stored.status).toBe("monitoring");
+  });
+
+  it("recovers an attachment-only legacy job from the local download without reopening Outlook detail", async () => {
+    const { chromeApi, values } = createChromeFake({
+      ok: true,
+      type: "OUTLOOK_SCAN_RESULT",
+      page: validPage,
+      mails: [newCandidateMail]
+    });
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const guiClient = {
+      loadMail: vi.fn(),
+      recoverDownloadedAttachments: vi.fn().mockResolvedValue([{
+        id: "recovered-image",
+        name: "BD73D418.png",
+        contentType: "image/png",
+        size: png.byteLength,
+        bytes: png,
+        localRef: {
+          id: "recovered-image",
+          path: "/Users/test/Downloads/BD73D418.png",
+          name: "BD73D418.png",
+          contentType: "image/png",
+          expectedSize: png.byteLength
+        }
+      }])
+    };
+    const richDelivery = {
+      sendTest: vi.fn().mockResolvedValue({ ok: true, code: 0 }),
+      deliver: vi.fn().mockResolvedValue({ ok: true })
+    };
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      guiClient,
+      richDelivery
+    });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SAVE_CONFIG",
+      payload: {
+        deliveryMode: "rich",
+        chatId: "oc_30c3295e3b77a970817952be0fffa7ee",
+        rulesConfirmed: true
+      }
+    });
+    await service.handleMessage({ type: "OUTLOOK_MONITOR_TEST_FEISHU" });
+    const jobCreatedAt = currentTime - 2 * 60 * 60 * 1000;
+    values[OUTLOOK_MONITOR_STORAGE_KEY].queue = [{
+      id: "legacy-job",
+      dedupeKeys: ["legacy-job"],
+      mails: [newCandidateMail],
+      attempts: 13,
+      createdAt: jobCreatedAt,
+      nextAttemptAt: currentTime,
+      status: "pending",
+      lastErrorCode: "outlook-gui-detail",
+      completedParts: ["card"]
+    }];
+    values[OUTLOOK_MONITOR_STORAGE_KEY].enabled = true;
+
+    await service.handleAlarm({ name: "outlook-monitor-retry" });
+
+    expect(guiClient.recoverDownloadedAttachments).toHaveBeenCalledWith({
+      since: jobCreatedAt,
+      until: jobCreatedAt + 30 * 60 * 1000
+    });
+    expect(guiClient.loadMail).not.toHaveBeenCalled();
+    expect(richDelivery.deliver).toHaveBeenCalledWith(expect.objectContaining({
+      completedParts: ["card"],
+      detail: expect.objectContaining({
+        attachments: [expect.objectContaining({ name: "BD73D418.png" })]
+      })
+    }));
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].queue).toEqual([]);
+  });
+
+  it("uses a newly downloaded retry copy when the original download window is empty", async () => {
+    const { chromeApi, values } = createChromeFake();
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
+    const attachment = {
+      id: "recent-retry-pdf",
+      name: "林诗青_简历_大使(1) (1).pdf",
+      contentType: "application/pdf",
+      size: pdf.byteLength,
+      bytes: pdf,
+      localRef: {
+        path: "/Users/test/Downloads/林诗青_简历_大使(1) (1).pdf",
+        name: "林诗青_简历_大使(1) (1).pdf",
+        expectedSize: pdf.byteLength
+      }
+    };
+    const guiClient = {
+      recoverDownloadedAttachments: vi.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([attachment]),
+      loadMail: vi.fn().mockResolvedValue({
+        body: "Candidate body",
+        bodyTruncated: false,
+        attachments: [],
+        skippedAttachments: [],
+        retryableAttachmentFailure: false
+      })
+    };
+    const richDelivery = {
+      sendTest: vi.fn().mockResolvedValue({ ok: true, code: 0 }),
+      deliver: vi.fn().mockResolvedValue({ ok: true })
+    };
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      guiClient,
+      richDelivery
+    });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SAVE_CONFIG",
+      payload: {
+        deliveryMode: "rich",
+        chatId: "oc_a676db7b8ae16f5ca23a9dd9b15ed3ca",
+        rulesConfirmed: true
+      }
+    });
+    values[OUTLOOK_MONITOR_STORAGE_KEY].enabled = true;
+    const jobCreatedAt = currentTime - 3 * 60 * 60_000;
+    values[OUTLOOK_MONITOR_STORAGE_KEY].queue = [{
+      id: "recent-retry-job",
+      dedupeKeys: ["recent-retry-job"],
+      mails: [newCandidateMail],
+      attempts: 8,
+      createdAt: jobCreatedAt,
+      nextAttemptAt: currentTime,
+      status: "pending",
+      completedParts: []
+    }];
+
+    await service.retryPendingNow();
+
+    expect(guiClient.recoverDownloadedAttachments).toHaveBeenNthCalledWith(1, {
+      since: jobCreatedAt,
+      until: jobCreatedAt + 30 * 60_000
+    });
+    expect(guiClient.recoverDownloadedAttachments).toHaveBeenNthCalledWith(2, {
+      since: currentTime - 30 * 60_000,
+      until: currentTime
+    });
+    expect(guiClient.loadMail).toHaveBeenCalledWith(expect.objectContaining({
+      hasAttachment: false
+    }));
+    expect(richDelivery.deliver).toHaveBeenCalledWith(expect.objectContaining({
+      detail: expect.objectContaining({
+        body: "Candidate body",
+        attachments: [attachment]
+      })
+    }));
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].queue).toEqual([]);
+  });
+
+  it("manually replays the latest visible mail without changing dedupe history", async () => {
+    const scanResult = {
+      ok: true,
+      type: "OUTLOOK_SCAN_RESULT",
+      page: validPage,
+      mails: [{ ...candidateMail, subject: "投递 3.0-测试邮件" }]
+    };
+    const { chromeApi, values } = createChromeFake(scanResult);
+    const guiClient = {
+      loadMail: vi.fn().mockResolvedValue({
+        body: "Candidate body",
+        attachments: [{
+          id: "resume-3",
+          name: "Candidate.pdf",
+          contentType: "application/pdf",
+          bytes: new Uint8Array([1, 2, 3])
+        }],
+        skippedAttachments: []
+      })
+    };
+    const richDelivery = {
+      sendTest: vi.fn().mockResolvedValue({ ok: true, code: 0 }),
+      deliver: vi.fn().mockResolvedValue({ ok: true })
+    };
+    const service = createOutlookMonitorService({
+      chromeApi,
+      cryptoApi: webcrypto,
+      now: () => currentTime,
+      guiClient,
+      richDelivery
+    });
+    await service.handleMessage({
+      type: "OUTLOOK_MONITOR_SAVE_CONFIG",
+      payload: {
+        deliveryMode: "rich",
+        chatId: "oc_30c3295e3b77a970817952be0fffa7ee",
+        rulesConfirmed: true
+      }
+    });
+    await service.handleMessage({ type: "OUTLOOK_MONITOR_TEST_FEISHU" });
+
+    const result = await service.handleMessage({ type: "OUTLOOK_MONITOR_REPLAY_LATEST" });
+
+    expect(result).toMatchObject({ ok: true, replayedSubject: "投递 3.0-测试邮件" });
+    expect(guiClient.loadMail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: "投递 3.0-测试邮件"
+    }));
+    expect(richDelivery.deliver).toHaveBeenCalledWith(expect.objectContaining({
+      chatId: "oc_30c3295e3b77a970817952be0fffa7ee",
+      mail: expect.objectContaining({ dedupeKey: `manual-replay-${currentTime}` }),
+      completedParts: []
+    }));
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].monitorState.seen).toEqual({});
+    expect(values[OUTLOOK_MONITOR_STORAGE_KEY].events.at(-1).code)
+      .toBe("manual_replay_succeeded");
   });
 });
