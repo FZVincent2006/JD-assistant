@@ -132,18 +132,8 @@ describe("Codex colleague installer package execution", () => {
     );
     expect(receipt.extensionId).toBe("mlhjjkclfiocgafhjdhoicghiabkeggg");
     expect(receipt.releaseTag).toBe("v0.2.0-codex.1");
-    expect(await readFile(path.join(fixture.home, "helper-install.txt"), "utf8"))
-      .toContain("--keep-existing-secret");
-  });
-
-  it("only replaces the stored secret when explicitly requested", async () => {
-    const fixture = await createInstallerFixture({ extensionVersion: "0.2.0" });
-    fixtureRoots.push(fixture.root);
-
-    await runFixture(fixture, "chrome", ["--replace-secret"]);
-
-    expect(await readFile(path.join(fixture.home, "helper-install.txt"), "utf8"))
-      .not.toContain("--keep-existing-secret");
+    await expect(readFile(path.join(fixture.home, "helper-install.txt"), "utf8"))
+      .rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("keeps the previous extension when the outer digest is wrong", async () => {

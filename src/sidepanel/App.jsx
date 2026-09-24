@@ -1,31 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BellRing, Bug, CheckCircle2, ClipboardPaste, ExternalLink, KeyRound, Send, Wand2 } from "lucide-react";
-import { PRODUCTION_FEISHU_DOC_URL } from "../lib/feishuConfig.js";
-import { parseCompanyJdBatch, validateCompanyDraft } from "../lib/companyJdParser.js";
+import { Bug, CheckCircle2, ClipboardPaste, Send, Wand2 } from "lucide-react";
 import { parseJd } from "../lib/jdParser.js";
 import {
   collectClickRecording,
   sendDiagnosticRequest,
-  sendFeishuRuntimeRequest,
-  sendFeishuWriteRequest,
   sendFillRequest,
   startClickRecording
 } from "./fillPage.js";
-import {
-  canRepairJobLinks,
-  canWriteFeishu,
-  countSelectedJobLinks,
-  describeJobLinkPlan,
-  describeFeishuPlan,
-  formatFeishuOperationError,
-  formatJobLinkRepairStatus,
-  formatFeishuWriteStatus,
-  groupJobLinkUpdates,
-  shouldOfferFeishuDocumentCheck,
-  updateJobDraftField
-} from "./feishuUi.js";
-import OutlookMonitorPanel from "./OutlookMonitorPanel.jsx";
 import zhenfundLogo from "./assets/zhenfund-logo.png";
 import "./styles.css";
 
@@ -50,57 +32,11 @@ function App() {
   const [platform, setPlatform] = useState("maimai");
   const [jdText, setJdText] = useState("");
   const [draft, setDraft] = useState(emptyDraft);
-  const [companyDraft, setCompanyDraft] = useState(null);
   const [status, setStatus] = useState("等待粘贴 JD");
   const [recording, setRecording] = useState(false);
-  const [authStatus, setAuthStatus] = useState("unknown");
-  const [inspection, setInspection] = useState(null);
-  const [writePlan, setWritePlan] = useState(null);
-  const [writeResult, setWriteResult] = useState(null);
-  const [writing, setWriting] = useState(false);
-  const [jobLinkPlan, setJobLinkPlan] = useState(null);
-  const [jobLinkResult, setJobLinkResult] = useState(null);
-  const [selectedJobLinkCompanies, setSelectedJobLinkCompanies] = useState([]);
-  const [repairingLinks, setRepairingLinks] = useState(false);
   const keywordText = useMemo(() => draft.keywords.join("、"), [draft.keywords]);
-  const feishuErrors = companyDraft ? validateCompanyDraft(companyDraft) : [];
-  const feishuWarnings = companyDraft ? getFeishuWarnings(companyDraft) : [];
-  const feishuReady = canWriteFeishu({ authStatus, inspection, plan: writePlan, errors: feishuErrors, writing });
-  const selectedJobLinkCount = countSelectedJobLinks(jobLinkPlan, selectedJobLinkCompanies);
-  const jobLinksReady = canRepairJobLinks({
-    authStatus,
-    plan: jobLinkPlan,
-    selectedJobCount: selectedJobLinkCount,
-    repairing: repairingLinks || writing
-  });
-
-  useEffect(() => {
-    if (platform !== "feishu") return undefined;
-    let current = true;
-    setAuthStatus("checking");
-    sendFeishuRuntimeRequest("FEISHU_AUTH_STATUS").then((response) => {
-      if (!current) return;
-      if (response?.ok) {
-        setAuthStatus(response.auth?.status ?? "unauthorized");
-      } else {
-        setAuthStatus("unauthorized");
-        setStatus(formatFeishuOperationError(response, "无法检查飞书授权状态。"));
-      }
-    });
-    return () => { current = false; };
-  }, [platform]);
 
   function parseCurrentJd() {
-    if (platform === "feishu") {
-      const parsed = parseCompanyJdBatch(jdText);
-      setCompanyDraft(parsed);
-      setWritePlan(null);
-      setWriteResult(null);
-      setStatus(parsed.errors.length
-        ? `解析完成，但有 ${parsed.errors.length} 项需要修正。`
-        : `已解析：${parsed.companyName || "未识别公司"}，${parsed.jobs.length} 个岗位。`);
-      return;
-    }
     const parsed = parseJd(jdText);
     setDraft(parsed);
     setStatus(`已解析：${parsed.title || "未识别岗位名"}`);
@@ -108,12 +44,10 @@ function App() {
 
   async function fillCurrentPage() {
     const response = await sendFillRequest(draft, platform);
-
     if (!response?.ok) {
       setStatus(response?.error || "填表失败，请确认已打开招聘平台发布职位页");
       return;
     }
-
     const missingText = response.missing.length ? `，未找到：${response.missing.join("、")}` : "";
     setStatus(`已填入 ${response.filled.length} 个字段${missingText}`);
   }
@@ -124,7 +58,6 @@ function App() {
       setStatus(response?.error || "诊断失败，请确认已打开招聘平台发布职位页");
       return;
     }
-
     const text = JSON.stringify(response.diagnostics, null, 2);
     try {
       await navigator.clipboard.writeText(text);
@@ -150,8 +83,7 @@ function App() {
       setStatus(response?.error || "点击记录复制失败");
       return;
     }
-
-    const recordings = response.responses.map(({ frameId, recording }) => ({ frameId, ...recording }));
+    const recordings = response.responses.map(({ frameId, recording: frameRecording }) => ({ frameId, ...frameRecording }));
     const text = JSON.stringify(recordings, null, 2);
     try {
       await navigator.clipboard.writeText(text);
@@ -166,206 +98,34 @@ function App() {
     setDraft((current) => ({ ...current, [field]: value }));
   }
 
-  function invalidateFeishuPlan() {
-    setWritePlan(null);
-    setWriteResult(null);
-  }
-
-  function updateCompanyField(field, value) {
-    setCompanyDraft((current) => ({ ...current, [field]: value }));
-    invalidateFeishuPlan();
-  }
-
-  function updateCompanyJob(index, field, value) {
-    setCompanyDraft((current) => updateJobDraftField(current, index, field, value));
-    invalidateFeishuPlan();
-  }
-
-  async function authorizeFeishu() {
-    const reauthorizing = authStatus === "authorized";
-    setAuthStatus("authorizing");
-    setStatus(reauthorizing ? "正在重新授权飞书…" : "正在授权飞书…");
-    if (reauthorizing) await sendFeishuRuntimeRequest("FEISHU_CLEAR_AUTH");
-    const response = await sendFeishuRuntimeRequest("FEISHU_AUTHORIZE");
-    if (!response?.ok) {
-      setAuthStatus("unauthorized");
-      setStatus(formatFeishuOperationError(response, "飞书授权失败。"));
-      return;
-    }
-    setAuthStatus(response.auth?.status ?? "authorized");
-    setInspection(null);
-    setWritePlan(null);
-    setWriteResult(null);
-    setJobLinkPlan(null);
-    setJobLinkResult(null);
-    setSelectedJobLinkCompanies([]);
-    setStatus("飞书授权成功，请粘贴并解析公司与岗位语料。");
-  }
-
-  async function inspectJobLinks() {
-    setRepairingLinks(true);
-    setJobLinkResult(null);
-    setStatus("正在只读检查 Portfolio 岗位链接…");
-    try {
-      const response = await sendFeishuRuntimeRequest("FEISHU_JOB_LINK_PLAN");
-      if (!response?.ok) {
-        setJobLinkPlan(null);
-        setSelectedJobLinkCompanies([]);
-        setStatus(formatFeishuOperationError(response, "岗位链接检查失败。"));
-        return;
-      }
-      setJobLinkPlan(response.plan);
-      setSelectedJobLinkCompanies([]);
-      const description = describeJobLinkPlan(response.plan);
-      setStatus(response.plan.ok
-        ? `${description.title}，文档版本 ${response.plan.baseRevisionId}。`
-        : description.detail);
-    } finally {
-      setRepairingLinks(false);
-    }
-  }
-
-  async function repairJobLinks() {
-    if (!jobLinksReady) {
-      setStatus("请先检查岗位链接，并确认文档版本没有变化。");
-      return;
-    }
-    const confirmed = window.confirm(
-      `将原位更新所选 ${selectedJobLinkCompanies.length} 家公司的 ${selectedJobLinkCount} 个 Portfolio 岗位链接，不修改岗位 JD。确认继续？`
-    );
-    if (!confirmed) return;
-    setRepairingLinks(true);
-    setJobLinkResult(null);
-    setStatus(`正在补全 ${selectedJobLinkCount} 个 Portfolio 岗位链接…`);
-    try {
-      const response = await sendFeishuRuntimeRequest("FEISHU_JOB_LINK_WRITE", {
-        baseRevisionId: jobLinkPlan.baseRevisionId,
-        companyNames: selectedJobLinkCompanies
-      });
-      setJobLinkResult(response);
-      setJobLinkPlan(null);
-      setSelectedJobLinkCompanies([]);
-      setStatus(formatJobLinkRepairStatus(response ?? {
-        status: "unknown",
-        repairHint: "岗位链接补全没有返回结果；不要重复提交。"
-      }));
-    } finally {
-      setRepairingLinks(false);
-    }
-  }
-
-  function toggleJobLinkCompany(companyName) {
-    setSelectedJobLinkCompanies((current) => current.includes(companyName)
-      ? current.filter((name) => name !== companyName)
-      : [...current, companyName]);
-  }
-
-  async function generateFeishuPlan() {
-    if (!companyDraft || feishuErrors.length) {
-      setStatus("请先修正预览中的必填项。");
-      return;
-    }
-    setStatus("正在检查正式招聘文档并生成块级写入计划…");
-    const response = await sendFeishuRuntimeRequest("FEISHU_PLAN", companyDraft);
-    if (!response?.ok) {
-      setWritePlan(null);
-      setStatus(formatFeishuOperationError(response, "写入计划生成失败。"));
-      return;
-    }
-    setInspection(response.inspection);
-    setWritePlan(response.plan);
-    setWriteResult(null);
-    const description = describeFeishuPlan(response.plan);
-    setStatus(response.plan.ok
-      ? `计划已生成：${description.title}，文档版本 ${response.plan.baseRevisionId}。`
-      : `计划不可执行：${response.plan.errors.join("；")}`);
-  }
-
-  async function writeFeishuDocument() {
-    if (!companyDraft || !feishuReady) {
-      setStatus("请先完成授权，并生成与当前文档版本一致的有效计划。");
-      return;
-    }
-    const planDescription = describeFeishuPlan(writePlan);
-    const confirmed = window.confirm(`计划：${planDescription.title}\n公司：${companyDraft.companyName}\n岗位：${writePlan.jobs.length} 个\n仅写入正式招聘文档。确认继续？`);
-    if (!confirmed) return;
-    setWriting(true);
-    setWriteResult(null);
-    setStatus(writePlan.mode === "resume-new-company"
-      ? "正在恢复正式招聘文档：不重复写 JD，直接补 Portfolio…"
-      : "正在写入正式招聘文档：先更新 JD 区，再更新岗位汇总区…");
-    try {
-      const response = await sendFeishuWriteRequest(companyDraft);
-      setWriteResult(response);
-      setStatus(formatFeishuWriteStatus(response ?? { ok: false, error: "飞书写入没有返回结果。" }));
-      setInspection(null);
-      setWritePlan(null);
-    } finally {
-      setWriting(false);
-    }
-  }
-
   return (
     <main className="shell">
       <header className="header">
         <div>
           <img className="brandLogo" src={zhenfundLogo} alt="ZhenFund 真格基金" />
           <h1>招聘 JD 发布助手</h1>
-          <p>选择平台，粘贴 JD，确认字段，然后填入招聘平台或正式招聘文档。</p>
+          <p>粘贴 JD，确认字段后填入 Boss 直聘或脉脉；发布操作请在招聘平台手动完成。</p>
         </div>
-        <div className="brandMark" aria-hidden="true">
-          <Wand2 size={20} />
-        </div>
+        <div className="brandMark" aria-hidden="true"><Wand2 size={20} /></div>
       </header>
 
       <section className="platformSwitch" aria-label="选择招聘平台">
-        <button
-          className={platform === "maimai" ? "active" : ""}
-          type="button"
-          onClick={() => setPlatform("maimai")}
-        >
-          脉脉
-        </button>
-        <button className={platform === "boss" ? "active" : ""} type="button" onClick={() => setPlatform("boss")}>
-          Boss 直聘
-        </button>
-        <button className={platform === "feishu" ? "active" : ""} type="button" onClick={() => setPlatform("feishu")}>
-          飞书文档
-        </button>
-        <button className={platform === "outlook" ? "active" : ""} type="button" onClick={() => setPlatform("outlook")}>
-          <BellRing size={14} />
-          Outlook 提醒
+        <button className={platform === "maimai" ? "active" : ""} type="button" onClick={() => setPlatform("maimai")}>脉脉</button>
+        <button className={platform === "boss" ? "active" : ""} type="button" onClick={() => setPlatform("boss")}>Boss 直聘</button>
+      </section>
+
+      <section className="panel">
+        <label htmlFor="jd">JD 原文</label>
+        <textarea id="jd" className="jdInput" placeholder="粘贴完整 JD" value={jdText} onChange={(event) => setJdText(event.target.value)} />
+        <button className="primary" type="button" onClick={parseCurrentJd} disabled={!jdText.trim()}>
+          <ClipboardPaste size={16} />解析 JD
         </button>
       </section>
 
-      {platform !== "outlook" && <section className="panel">
-        <label htmlFor="jd">JD 原文</label>
-        <textarea
-          id="jd"
-          className="jdInput"
-          placeholder={platform === "feishu" ? "粘贴一家公司的公司介绍和多个岗位 JD" : "从飞书复制完整 JD 到这里"}
-          value={jdText}
-          onChange={(event) => setJdText(event.target.value)}
-        />
-        <button className="primary" type="button" onClick={parseCurrentJd} disabled={!jdText.trim()}>
-          <ClipboardPaste size={16} />
-          {platform === "feishu" ? "解析公司与岗位" : "解析 JD"}
-        </button>
-      </section>}
-
-      {platform !== "feishu" && platform !== "outlook" && <section className="panel fields">
-        {platform === "maimai" && (
-          <Field label="公司名" value={draft.companyName} onChange={(value) => updateDraft("companyName", value)} />
-        )}
+      <section className="panel fields">
+        {platform === "maimai" && <Field label="公司名" value={draft.companyName} onChange={(value) => updateDraft("companyName", value)} />}
         <Field label="职位名称" value={draft.title} onChange={(value) => updateDraft("title", value)} />
-        {platform === "boss" && (
-          <SelectField
-            label="招聘类型"
-            value={draft.recruitmentType}
-            options={["社招全职", "应届校园招聘", "实习生招聘", "兼职招聘"]}
-            onChange={(value) => updateDraft("recruitmentType", value)}
-          />
-        )}
+        {platform === "boss" && <SelectField label="招聘类型" value={draft.recruitmentType} options={["社招全职", "应届校园招聘", "实习生招聘", "兼职招聘"]} onChange={(value) => updateDraft("recruitmentType", value)} />}
         <Field label="经验" value={draft.experience} onChange={(value) => updateDraft("experience", value)} />
         <Field label="学历" value={draft.education} onChange={(value) => updateDraft("education", value)} />
         <div className="salaryGrid">
@@ -373,334 +133,35 @@ function App() {
           <Field label="最高月薪(K)" value={draft.salaryMaxK} onChange={(value) => updateDraft("salaryMaxK", value)} />
         </div>
         <Field label="工作地址" value={draft.location} onChange={(value) => updateDraft("location", value)} />
-        {platform === "boss" && (
-          <Field label="关键词" value={keywordText} onChange={(value) => updateDraft("keywords", splitKeywords(value))} />
-        )}
-        {platform === "maimai" && (
-          <Field label="邮箱地址" value={draft.email} onChange={(value) => updateDraft("email", value)} />
-        )}
+        {platform === "boss" && <Field label="关键词" value={keywordText} onChange={(value) => updateDraft("keywords", splitKeywords(value))} />}
+        {platform === "maimai" && <Field label="邮箱地址" value={draft.email} onChange={(value) => updateDraft("email", value)} />}
         <label htmlFor="description">职位描述</label>
-        <textarea
-          id="description"
-          className="description"
-          value={draft.description}
-          onChange={(event) => updateDraft("description", event.target.value)}
-        />
-        <button className="primary" type="button" onClick={fillCurrentPage} disabled={!draft.title || !draft.description}>
-          <Send size={16} />
-          填入当前页面
-        </button>
-        <button className="secondary" type="button" onClick={diagnoseCurrentPage}>
-          <Bug size={16} />
-          诊断当前页面
-        </button>
+        <textarea id="description" className="description" value={draft.description} onChange={(event) => updateDraft("description", event.target.value)} />
+        <button className="primary" type="button" onClick={fillCurrentPage} disabled={!draft.title || !draft.description}><Send size={16} />填入当前页面</button>
+        <button className="secondary" type="button" onClick={diagnoseCurrentPage}><Bug size={16} />诊断当前页面</button>
         <div className="recordGrid">
-          <button className="secondary" type="button" onClick={startRecordingClicks}>
-            开始记录点击
-          </button>
-          <button className="secondary" type="button" onClick={copyRecordedClicks} disabled={!recording}>
-            复制点击记录
-          </button>
+          <button className="secondary" type="button" onClick={startRecordingClicks}>开始记录点击</button>
+          <button className="secondary" type="button" onClick={copyRecordedClicks} disabled={!recording}>复制点击记录</button>
         </div>
-      </section>}
+      </section>
 
-      {platform === "feishu" && (
-        <FeishuAccessPanel
-          authStatus={authStatus}
-          writing={writing}
-          repairingLinks={repairingLinks}
-          jobLinkPlan={jobLinkPlan}
-          jobLinkResult={jobLinkResult}
-          selectedCompanyNames={selectedJobLinkCompanies}
-          selectedJobCount={selectedJobLinkCount}
-          canRepairJobLinks={jobLinksReady}
-          onAuthorize={authorizeFeishu}
-          onInspectJobLinks={inspectJobLinks}
-          onRepairJobLinks={repairJobLinks}
-          onToggleJobLinkCompany={toggleJobLinkCompany}
-        />
-      )}
-
-      {platform === "feishu" && companyDraft && (
-        <FeishuPreview
-          draft={companyDraft}
-          errors={feishuErrors}
-          warnings={feishuWarnings}
-          writing={writing}
-          writePlan={writePlan}
-          writeResult={writeResult}
-          canPlan={authStatus === "authorized"}
-          canWrite={feishuReady}
-          onCompanyField={updateCompanyField}
-          onJobField={updateCompanyJob}
-          onPlan={generateFeishuPlan}
-          onWrite={writeFeishuDocument}
-        />
-      )}
-
-      {platform === "outlook" && <OutlookMonitorPanel />}
-
-      {platform !== "outlook" && <footer className="status">
-        <CheckCircle2 size={16} />
-        <span>{status}</span>
-      </footer>}
+      <footer className="status"><CheckCircle2 size={16} /><span>{status}</span></footer>
     </main>
   );
 }
 
-function FeishuAccessPanel({
-  authStatus,
-  writing,
-  repairingLinks,
-  jobLinkPlan,
-  jobLinkResult,
-  selectedCompanyNames,
-  selectedJobCount,
-  canRepairJobLinks: canRepair,
-  onAuthorize,
-  onInspectJobLinks,
-  onRepairJobLinks,
-  onToggleJobLinkCompany
-}) {
-  const authorized = authStatus === "authorized";
-  const checking = authStatus === "checking" || authStatus === "authorizing";
-  const linkDescription = jobLinkPlan ? describeJobLinkPlan(jobLinkPlan) : null;
-  const linkGroups = groupJobLinkUpdates(jobLinkPlan);
-  return (
-    <section className="panel feishuAccess">
-      <div className="environmentBadge">固定目标：正式招聘文档</div>
-      <div className={`authState ${authorized ? "authorized" : ""}`}>
-        <KeyRound size={16} />
-        <span>{authStatusLabel(authStatus)}</span>
-        {authorized && (
-          <button className="inlineAction" type="button" onClick={onAuthorize} disabled={checking || writing}>
-            重新授权
-          </button>
-        )}
-      </div>
-      {!authorized && (
-        <button className="secondary" type="button" onClick={onAuthorize} disabled={checking || writing}>
-          {authStatus === "expired" ? "重新授权" : "授权飞书"}
-        </button>
-      )}
-      <p className="helperText">生成写入计划时会自动检查正式文档、权限、模板和重复岗位。</p>
-      {authorized && (
-        <details className="linkMaintenance">
-          <summary>维护已有岗位链接</summary>
-          <p className="helperText">只处理能与岗位 JD 标题唯一匹配的岗位；不确定项保持原样。</p>
-          <ol className="linkSteps">
-            <li>点击“检查岗位链接”（只读，不修改文档）</li>
-            <li>在“可安全补全”中勾选公司</li>
-            <li>点击确认按钮完成所选岗位</li>
-          </ol>
-          {linkDescription && (
-            <div className={jobLinkPlan.ok ? "planCard linkPlan" : "planCard invalid linkPlan"}>
-              <strong>{linkDescription.title}</strong>
-              <p>{linkDescription.detail}</p>
-              {jobLinkPlan.ok && <span>基于文档版本 {jobLinkPlan.baseRevisionId}</span>}
-              {linkGroups.length > 0 && (
-                <fieldset className="linkCompanyPicker">
-                  <legend>可安全补全（建议先选择一家公司验收）</legend>
-                  {linkGroups.map((group, index) => (
-                    <label key={group.companyName} htmlFor={`job-link-company-${index}`}>
-                      <input
-                        id={`job-link-company-${index}`}
-                        type="checkbox"
-                        checked={selectedCompanyNames.includes(group.companyName)}
-                        onChange={() => onToggleJobLinkCompany(group.companyName)}
-                        disabled={checking || writing || repairingLinks}
-                      />
-                      <span>
-                        {group.companyName}（{group.jobCount} 个）
-                        <small>{group.jobs.join("；")}</small>
-                      </span>
-                    </label>
-                  ))}
-                  <p className="helperText">勾选后，下方的确认按钮才会启用。</p>
-                </fieldset>
-              )}
-              {linkDescription.manualIssueCount > 0 && (
-                <details className="manualIssues">
-                  <summary>需人工检查 {linkDescription.manualIssueCount} 项</summary>
-                  <p>这些岗位不会被自动修改：</p>
-                  <ul>
-                    {linkDescription.issues.map((issue, index) => (
-                      <li key={`${index}-${issue}`}>{issue}</li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          )}
-          {jobLinkResult && (
-            <div className={`writeResult ${jobLinkResult.status ?? "failed"}`}>
-              {formatJobLinkRepairStatus(jobLinkResult)}
-            </div>
-          )}
-          <button
-            className="secondary"
-            type="button"
-            onClick={onInspectJobLinks}
-            disabled={checking || writing || repairingLinks}
-          >
-            {repairingLinks ? "正在检查或补全…" : "检查岗位链接"}
-          </button>
-          {jobLinkPlan?.ok && jobLinkPlan.updateCount > 0 && (
-            <button
-              className="primary"
-              type="button"
-              onClick={onRepairJobLinks}
-              disabled={!canRepair}
-            >
-              确认补全已选 {selectedJobCount} 个岗位链接
-            </button>
-          )}
-        </details>
-      )}
-    </section>
-  );
-}
-
-function FeishuPreview({
-  draft,
-  errors,
-  warnings,
-  writing,
-  writePlan,
-  writeResult,
-  canPlan,
-  canWrite,
-  onCompanyField,
-  onJobField,
-  onPlan,
-  onWrite
-}) {
-  const planDescription = writePlan ? describeFeishuPlan(writePlan) : null;
-  return (
-    <section className="panel fields feishuPreview">
-      <div className="environmentBadge">预览字段可编辑；修改后必须重新生成计划</div>
-      <Field id="feishu-company" label="公司名" value={draft.companyName} onChange={(value) => onCompanyField("companyName", value)} />
-      <Field id="feishu-website" label="公司官网（可选）" value={draft.website} onChange={(value) => onCompanyField("website", value)} />
-      <TextAreaField
-        id="feishu-intro"
-        label="公司介绍"
-        value={draft.companyIntro.join("\n")}
-        onChange={(value) => onCompanyField("companyIntro", splitLines(value))}
-      />
-
-      {draft.jobs.map((job, index) => (
-        <article className="jobCard" key={index}>
-          <h2>岗位 {index + 1}</h2>
-          <Field id={`job-${index}-title`} label="岗位名称" value={job.title} onChange={(value) => onJobField(index, "title", value)} />
-          <div className="salaryGrid">
-            <Field id={`job-${index}-location`} label="地点" value={job.location} onChange={(value) => onJobField(index, "location", value)} />
-            <Field id={`job-${index}-employment`} label="招聘类型" value={job.employment} onChange={(value) => onJobField(index, "employment", value)} />
-          </div>
-          <TextAreaField id={`job-${index}-responsibilities`} label="工作内容" value={job.responsibilities.join("\n")} onChange={(value) => onJobField(index, "responsibilities", splitLines(value))} />
-          <TextAreaField id={`job-${index}-requirements`} label="职位要求" value={job.requirements.join("\n")} onChange={(value) => onJobField(index, "requirements", splitLines(value))} />
-          <TextAreaField id={`job-${index}-bonuses`} label="加分项（可选）" value={job.bonuses.join("\n")} onChange={(value) => onJobField(index, "bonuses", splitLines(value))} />
-        </article>
-      ))}
-
-      {warnings.length > 0 && <MessageList className="warningList" title="提醒" items={warnings} />}
-      {errors.length > 0 && <MessageList className="errorList" title="需要修正" items={errors} />}
-      {planDescription && (
-        <div className={writePlan.ok ? "planCard" : "planCard invalid"}>
-          <strong>{planDescription.title}</strong>
-          <p>{planDescription.position}</p>
-          {writePlan.ok && <span>基于文档版本 {writePlan.baseRevisionId}</span>}
-          {planDescription.jobs.length > 0 && <ul>{planDescription.jobs.map((job) => <li key={job}>{job}</li>)}</ul>}
-        </div>
-      )}
-      {writeResult && <div className={`writeResult ${writeResult.status ?? "failed"}`}>{formatFeishuWriteStatus(writeResult)}</div>}
-      {shouldOfferFeishuDocumentCheck(writeResult) && (
-        <a className="secondary manualDocumentCheck" href={PRODUCTION_FEISHU_DOC_URL} target="_blank" rel="noreferrer">
-          <ExternalLink size={15} />
-          打开正式文档检查
-        </a>
-      )}
-      <button className="secondary" type="button" onClick={onPlan} disabled={!canPlan || writing || errors.length > 0}>
-        检查并生成写入计划
-      </button>
-      <button className="primary" type="button" onClick={onWrite} disabled={!canWrite}>
-        <Send size={16} />
-        {writing
-          ? "正在写入…"
-          : writePlan?.mode === "resume-new-company"
-            ? "确认并恢复正式招聘文档"
-            : "确认并写入正式招聘文档"}
-      </button>
-    </section>
-  );
-}
-
-function MessageList({ className, title, items }) {
-  return <div className={className}><strong>{title}</strong><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></div>;
-}
-
-function Field({ id: providedId, label, value, onChange }) {
-  const id = providedId ?? label.replace(/\s/g, "");
-  return (
-    <>
-      <label htmlFor={id}>{label}</label>
-      <input id={id} value={value} onChange={(event) => onChange(event.target.value)} />
-    </>
-  );
-}
-
-function TextAreaField({ id, label, value, onChange }) {
-  return (
-    <>
-      <label htmlFor={id}>{label}</label>
-      <textarea id={id} className="compactTextArea" value={value} onChange={(event) => onChange(event.target.value)} />
-    </>
-  );
+function Field({ label, value, onChange }) {
+  const id = label.replace(/\s/g, "");
+  return <><label htmlFor={id}>{label}</label><input id={id} value={value} onChange={(event) => onChange(event.target.value)} /></>;
 }
 
 function SelectField({ label, value, options, onChange }) {
   const id = label.replace(/\s/g, "");
-  return (
-    <>
-      <label htmlFor={id}>{label}</label>
-      <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </>
-  );
+  return <><label htmlFor={id}>{label}</label><select id={id} value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></>;
 }
 
 function splitKeywords(value) {
-  return value
-    .split(/[、,，]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function splitLines(value) {
-  return value.split("\n").map((line) => line.trim().replace(/^[-•]\s*/, "")).filter(Boolean);
-}
-
-function getFeishuWarnings(draft) {
-  const warnings = [];
-  if (!draft.website?.trim()) warnings.push("未填写公司官网，公司名将以纯文本写入。");
-  if (!draft.companyIntro?.length) warnings.push("未填写公司介绍，确认写入时将使用“待补充”。");
-  return warnings;
-}
-
-function authStatusLabel(value) {
-  const labels = {
-    unknown: "尚未检查飞书授权",
-    checking: "正在检查飞书授权…",
-    authorizing: "正在等待飞书授权…",
-    authorized: "飞书已授权",
-    expired: "飞书授权已过期，请重新授权",
-    unauthorized: "飞书未授权"
-  };
-  return labels[value] ?? "飞书未授权";
+  return value.split(/[、,，]/).map((item) => item.trim()).filter(Boolean);
 }
 
 createRoot(document.getElementById("root")).render(<App />);

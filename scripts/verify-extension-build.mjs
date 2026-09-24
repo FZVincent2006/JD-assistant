@@ -1,54 +1,17 @@
 import { readdir, readFile } from "node:fs/promises";
 
 const distUrl = new URL("../dist/", import.meta.url);
-const builtScripts = Object.fromEntries(await Promise.all(
-  ["content.js", "outlook.js"].map(async (name) => [
-    name,
-    await readFile(new URL(name, distUrl), "utf8")
-  ])
-));
-
-for (const [name, content] of Object.entries(builtScripts)) {
-  if (/^\s*(?:import|export)\b/m.test(content)) {
-    throw new Error(`dist/${name} contains ES module syntax and cannot run as a manifest content script`);
-  }
-}
-
 const manifest = JSON.parse(await readFile(new URL("manifest.json", distUrl), "utf8"));
-const background = await readFile(new URL("background.js", distUrl), "utf8");
-const allJavaScriptFiles = await listJavaScriptFiles(distUrl);
-const allJavaScript = (await Promise.all(
-  allJavaScriptFiles.map((fileUrl) => readFile(fileUrl, "utf8"))
-)).join("\n");
-const requiredFeishuAppId = "cli_aaf06e1e3c385d1c";
-if (!allJavaScript.includes(requiredFeishuAppId)) {
-  throw new Error(`dist JavaScript is missing the required public Feishu App ID: ${requiredFeishuAppId}`);
-}
-const permissions = new Set(manifest.permissions ?? []);
-for (const forbidden of ["clipboardRead", "clipboardWrite", "debugger"]) {
-  if (permissions.has(forbidden)) throw new Error(`dist manifest contains forbidden permission: ${forbidden}`);
-}
-for (const required of ["alarms", "downloads", "identity", "storage", "nativeMessaging"]) {
-  if (!permissions.has(required)) throw new Error(`dist manifest is missing permission: ${required}`);
+const content = await readFile(new URL("content.js", distUrl), "utf8");
+if (/^\s*(?:import|export)\b/m.test(content)) {
+  throw new Error("dist/content.js contains ES module syntax and cannot run as a manifest content script");
 }
 
-const approvedFeishuHosts = [
-  "https://accounts.feishu.cn/*",
-  "https://open.feishu.cn/*"
-];
-const hostPermissionValues = manifest.host_permissions ?? [];
-const hostPermissions = new Set(hostPermissionValues);
-for (const required of [
-  ...approvedFeishuHosts,
-  "https://partner.outlook.cn/*"
-]) {
-  if (!hostPermissions.has(required)) throw new Error(`dist manifest is missing host permission: ${required}`);
+const expectedPermissions = ["activeTab", "scripting", "sidePanel", "tabs", "webNavigation"];
+if (JSON.stringify(manifest.permissions) !== JSON.stringify(expectedPermissions)) {
+  throw new Error(`dist manifest permissions differ from the approved set: ${manifest.permissions}`);
 }
-const feishuHosts = hostPermissionValues.filter((host) => host.includes("feishu.cn"));
-if (feishuHosts.length !== approvedFeishuHosts.length
-  || feishuHosts.some((host) => !approvedFeishuHosts.includes(host))) {
-  throw new Error("dist manifest contains an unapproved or duplicate Feishu host permission");
-}
+if (manifest.background) throw new Error("dist manifest unexpectedly contains a background worker");
 
 const recruitingMatches = [
   "https://*.zhipin.com/*",
@@ -59,72 +22,35 @@ const recruitingMatches = [
   "https://*.maimai.com/*"
 ];
 const contentScripts = manifest.content_scripts ?? [];
-const contentMatches = new Set(contentScripts.flatMap((script) => script.matches ?? []));
+if (contentScripts.length !== 1 || contentScripts[0].js?.join() !== "content.js") {
+  throw new Error("dist manifest must contain only the recruiting content script");
+}
+const matches = new Set(contentScripts[0].matches ?? []);
+const hosts = new Set(manifest.host_permissions ?? []);
 for (const required of recruitingMatches) {
-  if (!hostPermissions.has(required) || !contentMatches.has(required)) {
+  if (!matches.has(required) || !hosts.has(required)) {
     throw new Error(`dist manifest lost a recruiting page match: ${required}`);
   }
 }
-if (!contentScripts.some((script) =>
-  script.js?.includes("outlook.js")
-  && script.matches?.includes("https://partner.outlook.cn/mail/*"))) {
-  throw new Error("dist manifest is missing the Outlook monitor content script");
-}
-const feishuEntries = contentScripts.filter((script) =>
-  (script.matches ?? []).some((match) => match.includes("feishu.cn")));
-if (feishuEntries.length !== 0) {
-  throw new Error("dist manifest must not inject a content script into Feishu pages");
+if ([...matches, ...hosts].some((value) => /feishu|outlook/i.test(value))) {
+  throw new Error("dist manifest contains a removed platform host");
 }
 
-for (const messageType of [
-  "FEISHU_AUTH_STATUS",
-  "FEISHU_AUTHORIZE",
-  "FEISHU_INSPECT",
-  "FEISHU_PLAN",
-  "FEISHU_WRITE",
-  "FEISHU_CLEAR_AUTH",
-  "FEISHU_JOB_LINK_PLAN",
-  "FEISHU_JOB_LINK_WRITE"
-]) {
-  if (!background.includes(messageType)) throw new Error(`dist background is missing ${messageType}`);
-}
-for (const messageType of [
-  "OUTLOOK_MONITOR_GET",
-  "OUTLOOK_MONITOR_SAVE_CONFIG",
-  "OUTLOOK_MONITOR_SET_ENABLED",
-  "OUTLOOK_READ_MAIL_DETAIL",
-  "OUTLOOK_TRIGGER_ATTACHMENT_DOWNLOAD",
-  "GET_TENANT_TOKEN"
-]) {
-  if (!background.includes(messageType)) throw new Error(`dist background is missing ${messageType}`);
+for (const obsolete of ["FEISHU_", "OUTLOOK_", "accounts.feishu.cn", "partner.outlook.cn"]) {
+  if (content.includes(obsolete)) throw new Error(`dist content bundle contains removed feature marker: ${obsolete}`);
 }
 
-if (background.includes("APPLY_HEADING_NUMBERING")) {
-  throw new Error("dist background still contains the removed native heading-numbering request");
-}
-if (builtScripts["content.js"].includes("FEISHU_PREPARE_HEADING_NUMBERING")) {
-  throw new Error("dist content still contains the removed Feishu heading preparation route");
-}
-if (`${background}\n${builtScripts["content.js"]}`.includes("shortcut-rejected")) {
-  throw new Error("dist contains the removed synthetic page-shortcut path");
+const files = await listFiles(distUrl);
+if (files.includes("background.js") || files.includes("outlook.js")) {
+  throw new Error("dist contains a removed background or Outlook bundle");
 }
 
-for (const fileUrl of allJavaScriptFiles) {
-  const content = await readFile(fileUrl, "utf8");
-  if (/open-apis\/bot\/v2\/hook\/[A-Za-z0-9_-]{16,}/.test(content)) {
-    throw new Error(`Built JavaScript contains an apparent hardcoded Feishu webhook: ${fileUrl.pathname}`);
-  }
-}
-
-async function listJavaScriptFiles(directoryUrl) {
-  const files = [];
+async function listFiles(directoryUrl, prefix = "") {
+  const results = [];
   for (const entry of await readdir(directoryUrl, { withFileTypes: true })) {
-    const entryUrl = new URL(entry.name + (entry.isDirectory() ? "/" : ""), directoryUrl);
-    if (entry.isDirectory()) {
-      files.push(...await listJavaScriptFiles(entryUrl));
-    } else if (entry.isFile() && entry.name.endsWith(".js")) {
-      files.push(entryUrl);
-    }
+    const relative = `${prefix}${entry.name}`;
+    if (entry.isDirectory()) results.push(...await listFiles(new URL(`${entry.name}/`, directoryUrl), `${relative}/`));
+    else if (entry.isFile()) results.push(relative);
   }
-  return files;
+  return results;
 }

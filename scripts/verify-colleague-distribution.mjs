@@ -8,57 +8,28 @@ if (!process.argv[2]) throw new Error("Usage: verify-colleague-distribution <pac
 
 const requiredFiles = [
   "扩展/manifest.json",
-  "扩展/background.js",
-  "原生助手/Feishu JD Assistant Helper.app/Contents/Info.plist",
-  "原生助手/Feishu JD Assistant Helper.app/Contents/MacOS/feishu-auth-host",
-  "scripts/install-feishu-auth-helper.sh",
-  "安装飞书授权助手.command",
+  "扩展/index.html",
+  "扩展/content.js",
+  "skills/jd-skill/SKILL.md",
   "安装说明.md",
   "VERSION.txt",
   "SHA256SUMS.txt"
 ];
 for (const relativePath of requiredFiles) await requireRegularFile(relativePath);
-for (const relativePath of [
-  "原生助手/Feishu JD Assistant Helper.app/Contents/MacOS/feishu-auth-host",
-  "scripts/install-feishu-auth-helper.sh",
-  "安装飞书授权助手.command"
-]) {
-  const info = await stat(path.join(packageDir, relativePath));
-  if ((info.mode & 0o111) === 0) throw new Error(`Distribution entry is not executable: ${relativePath}`);
-}
 
 const version = parseKeyValue(await readFile(path.join(packageDir, "VERSION.txt"), "utf8"));
 if (!/^[a-p]{32}$/.test(version.EXTENSION_ID ?? "")) throw new Error("VERSION.txt has an invalid extension ID");
-if (version.REDIRECT_URL !== `https://${version.EXTENSION_ID}.chromiumapp.org/feishu`) {
-  throw new Error("VERSION.txt redirect URL does not match the extension ID");
-}
-
 const manifest = JSON.parse(await readFile(path.join(packageDir, "扩展/manifest.json"), "utf8"));
 if (extensionIdFromManifestKey(manifest.key) !== version.EXTENSION_ID) {
   throw new Error("Packaged manifest key does not match VERSION.txt");
 }
-const feishuPageScripts = (manifest.content_scripts ?? []).filter((entry) =>
-  (entry.matches ?? []).some((value) => value.includes("feishu.cn"))
-);
-if (feishuPageScripts.length !== 0) throw new Error("Distribution must not inject a script into Feishu pages");
+if (manifest.background) throw new Error("Reduced extension must not contain a background worker");
+if ((manifest.content_scripts ?? []).length !== 1) throw new Error("Package must contain one recruiting content script");
+if ((manifest.permissions ?? []).some((permission) => ["alarms", "downloads", "identity", "notifications", "storage"].includes(permission))) {
+  throw new Error("Package contains a removed permission");
+}
 
 const allFiles = await listRegularFiles(packageDir);
-const extensionJavaScript = (await Promise.all(
-  allFiles
-    .filter((relativePath) => relativePath.startsWith("扩展/") && relativePath.endsWith(".js"))
-    .map((relativePath) => readFile(path.join(packageDir, relativePath), "utf8"))
-)).join("\n");
-if (!extensionJavaScript.includes("RTWjwVZjri4uCUk0J8wcn2K3n6d")) {
-  throw new Error("Packaged extension is not locked to the production document");
-}
-if (extensionJavaScript.includes("LlhrwSLIvilANZk1opwcQGlUnNv")) {
-  throw new Error("Packaged extension contains the retired test document");
-}
-if (extensionJavaScript.includes("APPLY_HEADING_NUMBERING")
-  || extensionJavaScript.includes("FEISHU_PREPARE_HEADING_NUMBERING")) {
-  throw new Error("Packaged extension contains removed page-numbering behavior");
-}
-
 for (const relativePath of allFiles) {
   if (/(^|\/)(?:\.env\.local|private\.der)$/i.test(relativePath)
     || /\.(?:pem|p12|key)$/i.test(relativePath)) {
@@ -68,7 +39,6 @@ for (const relativePath of allFiles) {
   if (data.length <= 2_000_000 && !data.includes(0)) {
     const text = data.toString("utf8");
     if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(text)
-      || /(?:VITE_FEISHU_APP_SECRET|FEISHU_APP_SECRET)\s*=\s*\S+/.test(text)
       || /"(?:accessToken|refreshToken)"\s*:\s*"[^"\s]{16,}"/.test(text)) {
       throw new Error(`Distribution contains sensitive material: ${relativePath}`);
     }

@@ -6,13 +6,12 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHANNEL_PATH="$ROOT_DIR/distribution/release-channel.json"
 FIXED_REPOSITORY="FZVincent2006/JD-assistant"
 FIXED_EXTENSION_ID="mlhjjkclfiocgafhjdhoicghiabkeggg"
-APP_ID="cli_aade4224b8789bef"
 INSTALL_PARENT="$HOME/Library/Application Support/ZhenFund JD Assistant"
 EXTENSION_DIR="$INSTALL_PARENT/Extension"
 
 usage() {
   printf '%s\n' \
-    "Usage: $0 [--dry-run] [--browser auto|chrome|edge] [--package /absolute/package.zip] [--replace-secret]" >&2
+    "Usage: $0 [--dry-run] [--browser auto|chrome|edge] [--package /absolute/package.zip]" >&2
   exit 2
 }
 
@@ -177,7 +176,6 @@ promote_extension() {
 DRY_RUN=0
 BROWSER_REQUEST="auto"
 PACKAGE_PATH=""
-REPLACE_SECRET=0
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -194,10 +192,6 @@ while [[ "$#" -gt 0 ]]; do
       [[ "$#" -ge 2 ]] || usage
       PACKAGE_PATH="$2"
       shift 2
-      ;;
-    --replace-secret)
-      REPLACE_SECRET=1
-      shift
       ;;
     *)
       usage
@@ -307,11 +301,8 @@ PACKAGE_ROOT="$(cd "$(dirname "$VERSION_FILE")" && pwd)"
 
 REQUIRED_FILES=(
   "扩展/manifest.json"
-  "扩展/background.js"
-  "原生助手/Feishu JD Assistant Helper.app/Contents/MacOS/feishu-auth-host"
-  "scripts/install-feishu-auth-helper.sh"
-  "安装飞书授权助手.command"
   "安装说明.md"
+  "skills/jd-skill/SKILL.md"
   "VERSION.txt"
   "SHA256SUMS.txt"
 )
@@ -319,40 +310,21 @@ for relative_path in "${REQUIRED_FILES[@]}"; do
   [[ -f "$PACKAGE_ROOT/$relative_path" ]] \
     || fail "Required package file is missing: $relative_path"
 done
-for executable_path in \
-  "原生助手/Feishu JD Assistant Helper.app/Contents/MacOS/feishu-auth-host" \
-  "scripts/install-feishu-auth-helper.sh" \
-  "安装飞书授权助手.command"; do
-  [[ -x "$PACKAGE_ROOT/$executable_path" ]] \
-    || fail "Required package entry is not executable: $executable_path"
-done
-
 verify_package_files
 
 PACKAGE_EXTENSION_ID="$(version_value EXTENSION_ID)"
 PACKAGE_EXTENSION_VERSION="$(version_value EXTENSION_VERSION)"
-PACKAGE_REDIRECT_URL="$(version_value REDIRECT_URL)"
 PACKAGE_BUILD_COMMIT="$(version_value GIT_COMMIT)"
 [[ "$PACKAGE_EXTENSION_ID" == "$FIXED_EXTENSION_ID" ]] \
   || fail "Package extension ID does not match the fixed extension ID."
 [[ "$PACKAGE_EXTENSION_VERSION" == "$EXTENSION_VERSION" ]] \
   || fail "Package extension version does not match the release channel."
-[[ "$PACKAGE_REDIRECT_URL" == "https://$FIXED_EXTENSION_ID.chromiumapp.org/feishu" ]] \
-  || fail "Package redirect URL does not match the fixed extension ID."
 [[ "$PACKAGE_BUILD_COMMIT" == "$BUILD_COMMIT" ]] \
   || fail "Package build commit does not match the release channel."
 MANIFEST_VERSION="$(/usr/bin/plutil -extract version raw -o - "$PACKAGE_ROOT/扩展/manifest.json" 2>/dev/null)" \
   || fail "Package extension manifest is invalid."
 [[ "$MANIFEST_VERSION" == "$EXTENSION_VERSION" ]] \
   || fail "Package manifest version does not match the release channel."
-
-HELPER_ARGS=()
-if [[ "$REPLACE_SECRET" -eq 0 ]]; then
-  HELPER_ARGS+=("--keep-existing-secret")
-fi
-HELPER_ARGS+=("chrome-extension://$FIXED_EXTENSION_ID/")
-FEISHU_HELPER_APP_PATH="$PACKAGE_ROOT/原生助手/Feishu JD Assistant Helper.app" \
-  "$PACKAGE_ROOT/scripts/install-feishu-auth-helper.sh" "${HELPER_ARGS[@]}"
 
 /bin/mkdir -p "$INSTALL_PARENT"
 STAGING_EXTENSION="$INSTALL_PARENT/.Extension.new"
