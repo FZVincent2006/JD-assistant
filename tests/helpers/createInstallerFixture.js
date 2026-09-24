@@ -45,29 +45,8 @@ export async function createInstallerFixture(options = {}) {
   await copyFile(SOURCE_INSTALLER, path.join(scriptsDir, "install-from-github.sh"));
   await chmod(path.join(scriptsDir, "install-from-github.sh"), 0o755);
 
-  const helperBinary = path.join(
-    packageRoot,
-    "原生助手/Feishu JD Assistant Helper.app/Contents/MacOS/feishu-auth-host"
-  );
-  const helperInstaller = path.join(packageRoot, "scripts/install-feishu-auth-helper.sh");
-  await mkdir(path.dirname(helperBinary), { recursive: true });
-  await mkdir(path.dirname(helperInstaller), { recursive: true });
   await mkdir(path.join(packageRoot, "扩展"), { recursive: true });
-
-  await writeFile(helperBinary, "#!/usr/bin/env bash\nexit 0\n", "utf8");
-  await chmod(helperBinary, 0o755);
-  await writeFile(
-    helperInstaller,
-    [
-      "#!/usr/bin/env bash",
-      "set -euo pipefail",
-      "printf '%s\\n' \"$*\" > \"$HOME/helper-install.txt\"",
-      "exit 0",
-      ""
-    ].join("\n"),
-    "utf8"
-  );
-  await chmod(helperInstaller, 0o755);
+  await mkdir(path.join(packageRoot, "skills/jd-skill"), { recursive: true });
   await writeFile(
     path.join(packageRoot, "扩展/manifest.json"),
     `${JSON.stringify({
@@ -77,17 +56,9 @@ export async function createInstallerFixture(options = {}) {
     }, null, 2)}\n`,
     "utf8"
   );
-  await writeFile(
-    path.join(packageRoot, "扩展/background.js"),
-    "globalThis.fixture = true;\n",
-    "utf8"
-  );
-  await writeFile(
-    path.join(packageRoot, "安装飞书授权助手.command"),
-    "#!/usr/bin/env bash\nexit 0\n",
-    "utf8"
-  );
-  await chmod(path.join(packageRoot, "安装飞书授权助手.command"), 0o755);
+  await writeFile(path.join(packageRoot, "扩展/index.html"), "<html></html>\n", "utf8");
+  await writeFile(path.join(packageRoot, "扩展/content.js"), "globalThis.fixture = true;\n", "utf8");
+  await writeFile(path.join(packageRoot, "skills/jd-skill/SKILL.md"), "# JD Skill\n", "utf8");
   await writeFile(path.join(packageRoot, "安装说明.md"), "# Fixture\n", "utf8");
   await writeFile(
     path.join(packageRoot, "VERSION.txt"),
@@ -96,7 +67,6 @@ export async function createInstallerFixture(options = {}) {
       "BUILD_DATE=20260714",
       `EXTENSION_VERSION=${extensionVersion}`,
       `EXTENSION_ID=${versionExtensionId}`,
-      `REDIRECT_URL=https://${versionExtensionId}.chromiumapp.org/feishu`,
       `GIT_COMMIT=${BUILD_COMMIT}`,
       ""
     ].join("\n"),

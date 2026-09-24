@@ -13,7 +13,6 @@ const versionLines = [
   `BUILD_DATE=${buildDate}`,
   `EXTENSION_VERSION=${extensionVersion}`,
   `EXTENSION_ID=${extensionId}`,
-  `REDIRECT_URL=https://${extensionId}.chromiumapp.org/feishu`,
   `GIT_COMMIT=${gitCommit}`,
   ""
 ];
