@@ -5,14 +5,15 @@ const read = (relativePath) =>
   readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
 describe("colleague release workflow", () => {
-  it("builds one ASCII-named universal macOS asset", () => {
+  it("builds a checksummed extension and JD Skill macOS package", () => {
     const build = read("scripts/build-colleague-distribution.sh");
 
     expect(build).toContain("JD-assistant-macOS-$BUILD_DATE.zip");
     expect(build).toContain("date -u +%Y%m%d");
     expect(build).toContain("BUILD_DATE must use YYYYMMDD");
-    expect(build).toContain("lipo");
-    expect(build).toContain("codesign --verify --strict");
+    expect(build).toContain("skills/jd-skill");
+    expect(build).toContain("scripts/verify-colleague-distribution.mjs");
+    expect(build).not.toMatch(/native-helper|codesign|lipo/i);
   });
 
   it("publishes only after tests and package verification", () => {

@@ -1,299 +1,65 @@
 # 招聘 JD 发布助手
 
-## 让 Codex 安装（同事推荐入口）
+本仓库包含两项相互独立的工具：Chrome/Edge 扩展用于解析 JD 并辅助填写 Boss 直聘、脉脉招聘表单；`jd-skill` 用于把 JD 图片、截图或 OCR 文本整理成结构化招聘信息。
 
-把下面整段发给同事电脑上的 Codex：
+## 扩展使用
 
-```text
-请安装这个仓库中的招聘 JD 发布助手：
-https://github.com/FZVincent2006/JD-assistant
-按照仓库的 CODEX_INSTALL.md 执行。除 App Secret 和浏览器安全确认外，其余步骤请自动完成并验证。
-```
+1. 打开扩展侧栏，选择“Boss 直聘”或“脉脉”。
+2. 粘贴完整 JD，点击“解析 JD”。
+3. 检查并按需修改解析出的职位、薪资、地点、经验、学历和职位描述。
+4. 在对应平台的职位发布页面点击“填入当前页面”。
+5. 检查页面内容并由招聘人员手动发布。
 
-同事不需要安装 Node.js、Git、Swift 或 Xcode，也不需要手动下载构建产物。Codex 会按照 [CODEX_INSTALL.md](CODEX_INSTALL.md) 下载并校验固定 GitHub Release、安装本机授权助手，然后把稳定扩展目录交给 Chrome/Edge。人工只在首次安装时隐藏输入 App Secret，并在浏览器中确认加载扩展；重装默认保留 Keychain 中已有的 Secret。
+Boss 支持招聘类型、关键词等字段；脉脉支持公司名、邮箱等字段。页面结构异常时，可使用“诊断当前页面”和“开始记录点击”协助排查。扩展保留 Boss 表单 iframe 回退。
 
-macOS 上的 Chrome/Edge 扩展，用于解析招聘 JD，自动填入 Boss 直聘、脉脉，通过飞书 OpenAPI 更新固定的正式招聘文档，并在本机监控中国区 Outlook Recruiting 邮箱的新个人投递。
+扩展只对当前支持的招聘平台页面执行填充。最终字段复核和发布由使用者负责；助手不会替用户提交职位。
 
-- Boss/脉脉沿用原有页面填充逻辑，最后的发布按钮仍由人工点击。
-- 飞书采用“授权 → 检查 → 生成计划 → 人工确认 → 分阶段写入 → API 回读校验”的流程。
-- 飞书只允许写入正式招聘文档：<https://zhenfund.feishu.cn/wiki/RTWjwVZjri4uCUk0J8wcn2K3n6d>。
-- 扩展只通过飞书 OpenAPI 读写这个固定正式文档，不提供测试/正式切换，不向飞书页面注入脚本，也不会发送自动编号快捷键。
-- Outlook 提醒只在本机运行；首次建立历史基线。增强模式直接复用已登录的 Outlook 网页，打开新邮件后读取正文和简历附件，并发送到指定私密飞书群；旧的仅主题 Webhook 模式继续保留。
+## 安装扩展
 
-## 当前能力
+使用本仓库构建的发布包时，先解压完整目录，再按以下步骤操作：
 
-- 解析一家公司的公司名、官网、公司介绍和多个岗位。
-- 预览并编辑岗位名称、地点、招聘类型、工作内容、职位要求和可选加分项。
-- 新公司同时置顶 Portfolio 汇总和岗位 JD；老公司只在原分组末尾追加岗位。
-- 若完整 JD 已存在但 Portfolio 尚未写入，只有逐字段、逐条目完全匹配时才生成 `resume-new-company` 恢复计划；恢复不会重复写入 JD。
-- 岗位 JD 使用飞书原生块：根级 Heading 1 公司名、灰色 Heading 2、公司介绍 Callout、岗位标题和 QuoteContainer。
-- 先写岗位 JD，回读校验成功后才写 Portfolio；API 返回成功本身不视为完成。
-- Portfolio 岗位 Bullet 会直接带上对应岗位 JD 标题的文档内跳转链接。
-- 可通过默认收起的“维护已有岗位链接”扫描并原位补全历史岗位链接。
-- 网络超时只回读一次，不重试写入；结果会区分成功、部分完成、失败和未知。
-- Boss/脉脉支持原有字段填充、iframe 回退、诊断和点击记录。
+1. 在 Chrome 打开 `chrome://extensions`，或在 Edge 打开 `edge://extensions`。
+2. 开启“开发者模式”，点击“加载已解压的扩展程序”。
+3. 选择发布包中的 `扩展` 文件夹，并确认扩展已启用。
 
-## 飞书应用配置（管理员一次性）
+仅使用经维护者确认、与当前源码对应的发布包。发布包构建方式见下文；仓库 `distribution/release-channel.json` 指向已发布的固定版本，发布新代码后需先生成并发布新版本，再更新该文件，不能把旧 Release 当成本次精简版本安装。
 
-使用企业自建应用 `邮件简历发布助手`，App ID 为 `cli_aaf06e1e3c385d1c`。App Secret 不得写入仓库、`.env`、聊天或安装说明。
+## JD Skill
 
-飞书文档功能需要以下三个用户身份权限：
-
-- `wiki:wiki:readonly`
-- `docx:document:readonly`
-- `docx:document:write_only`
-
-如需在 Outlook 提醒中发送邮件正文和简历附件，还需为同一应用开启机器人能力，并增加：
-
-- 以应用身份发送消息（`im:message:send_as_bot`）
-- 获取与上传图片或文件资源（`im:resource`）
-
-发布权限变更后，把应用机器人加入接收提醒的私密飞书群，并确保机器人拥有发言权限。
-
-管理员还需要：
-
-1. 在应用可用范围中加入实际使用的四位同事，并发布新版本。
-2. 保留固定扩展 ID 对应的回调地址：
-
-   ```text
-   https://mlhjjkclfiocgafhjdhoicghiabkeggg.chromiumapp.org/feishu
-   ```
-
-3. 保留正式招聘文档对这四位同事的阅读和编辑权限。
-
-通过仓库推荐安装入口加载时，Chrome 和 Edge 都必须显示固定扩展 ID `mlhjjkclfiocgafhjdhoicghiabkeggg`。若显示其他 ID，应停止安装，而不是给飞书应用新增回调地址。
-
-## 开发构建
-
-要求 macOS 13+、Node.js，以及构建原生助手时可用的 Swift/Xcode Command Line Tools。
-
-```bash
-npm install
-cat > .env.local <<'ENV'
-VITE_FEISHU_APP_ID=cli_aaf06e1e3c385d1c
-VITE_FEISHU_AUTH_MODE=native
-ENV
-npm run build
-scripts/build-feishu-auth-helper.sh
-```
-
-`.env.local` 已被 Git 忽略。App ID 是公开标识；App Secret 只会在安装助手时通过隐藏输入写入当前 macOS 用户的 Keychain。
-
-## 四人安装（无服务器）
-
-推荐直接使用本文开头的“让 Codex 安装”入口。下面的步骤仅用于开发者手工排障，不应作为同事的日常安装流程。
-
-可以由一位开发者生成 `dist` 和 universal 原生助手，再通过内部安全渠道把同一份构建包发给四位同事；也可以每个人在本机执行上面的构建步骤。
-
-每台 Mac 的安装步骤：
-
-1. 在 `chrome://extensions` 或 `edge://extensions` 开启开发者模式。
-2. 选择“加载已解压的扩展程序”，加载 `dist`。
-3. 确认页面显示的扩展 ID 是 `mlhjjkclfiocgafhjdhoicghiabkeggg`；不一致时停止。
-4. 确认飞书应用已有固定回调地址，无需为不同电脑新增回调。
-5. 安装当前用户级原生助手。只使用一个浏览器时传一个 origin，同时使用两个浏览器时一起传入：
-
-   ```bash
-   scripts/install-feishu-auth-helper.sh \
-     chrome-extension://mlhjjkclfiocgafhjdhoicghiabkeggg/
-   ```
-
-6. 脚本提示时粘贴 App Secret 并回车。输入不可见；Secret 只保存到当前用户 Keychain，service 为 `cn.zhenfund.jd-assistant.feishu`。
-7. 完全退出并重新打开 Chrome/Edge，重新加载扩展，选择“飞书文档”，点击“授权飞书”。
-
-安装程序在用户目录中写入 Chrome 和 Edge 的 Native Messaging manifest，不需要管理员权限、后台服务、开放端口或常驻进程。
-
-本机助手只负责安全保存 App Secret 和交换飞书授权令牌，不控制浏览器页面，不需要“辅助功能”“屏幕录制”、输入监控、完全磁盘访问或管理员权限。Chrome 与 Edge 均使用固定扩展 ID；扩展管理页显示不一致即视为安装失败。
-
-重新授权的日常成本较低：短期 token 过期后只需在侧栏再次点击“授权飞书”并确认；Keychain 中的 App Secret 不需要重复输入。只有 App Secret 被轮换、扩展 ID 改变、删除 Keychain 项或重装助手时，才需要重新配置本机助手。
-
-卸载助手但保留 Keychain Secret：
-
-```bash
-scripts/install-feishu-auth-helper.sh --uninstall
-```
-
-同时删除本机 Keychain Secret：
-
-```bash
-scripts/install-feishu-auth-helper.sh --uninstall --delete-secret
-```
-
-## 飞书文档使用流程
-
-1. 打开扩展侧栏并选择“飞书文档”；正式招聘文档无需打开，也不需要保持为活动标签页。
-2. 点击“授权飞书”或“重新授权”。
-3. 粘贴并解析公司与岗位语料，检查可编辑预览字段。
-4. 点击“检查并生成写入计划”；扩展会自动读取最新正式文档，并检查权限、模板、重复岗位和文档版本。
-5. 确认 `new-company`、`append-jobs` 或 `resume-new-company` 的位置与动作。
-6. 点击“确认并写入正式招聘文档”，在系统确认框中再次确认。
-7. 扩展通过 OpenAPI 创建并校验 JD，随后使用真实岗位标题块 ID 写入带跳转链接的 Portfolio，并再次回读校验；公司名保持为普通根级 Heading 1。
-8. 写入成功后，如需公司标题显示并自动维护 `1.` 序号，在飞书页面中手动为该 Heading 1 开启有序编号。
-
-`resume-new-company` 只用于恢复“JD 已完整写入、Portfolio 尚不存在”的中断状态。扩展会先确认现有公司位于 JD 首位，并逐项核对公司介绍、岗位顺序、序号、标题、地点、类型、工作内容、职位要求和加分项；任何差异都会停止。完全一致时，它跳过 JD 创建，直接写入并校验 Portfolio。
-
-推荐输入格式：
-
-```text
-CoFANCY 可糖
-公司介绍
-CoFANCY 可糖是一个高端角膜接触镜品牌。
-
-（1）品牌设计｜上海｜社招
-工作内容：
-- 建设品牌视觉。
-职位要求：
-- 具备 3 年左右设计经验。
-加分项：
-- 有美妆品牌经验。
-
-（2）销售主管/分销主管｜深圳｜社招
-工作内容：
-- 管理分销渠道。
-职位要求：
-- 具备 5 年以上销售经验。
-```
-
-官网缺失时公司名写纯文本；公司介绍缺失时写一个“待补充”项目；加分项缺失时不创建该段。
-
-### 补全已有 Portfolio 岗位链接
-
-日常新增 JD 不需要增加操作步骤。需要修复历史岗位时：
-
-1. 在“飞书文档”的授权区域展开“维护已有岗位链接”。
-2. 点击“检查岗位链接”。该步骤只读，不修改正式文档。
-3. 在“可安全补全”中勾选公司。首次建议只选一家公司，确认岗位跳转正确后再处理其他公司。
-4. 点击“确认补全已选 N 个岗位链接”，并在确认框中再次确认。
-5. 扩展按公司名、岗位名、地点和招聘类型唯一匹配岗位 JD 标题，原位更新所选公司的 Portfolio Bullet 后回读校验。
-6. 展开“需人工检查”可查看无法安全处理的历史项；这些岗位保持原样，不影响其他安全项执行。
-7. 继续检查并处理剩余安全项；只有没有待更新或人工项时才会显示“全部岗位链接已正确”。
-
-如果检查后提示文档版本已变化，扩展不会写入；重新点击“检查岗位链接”生成最新计划。
-公司或岗位无法唯一匹配、Portfolio 岗位字段不完整、富文本无法安全保留，或已有链接的
-目标无法确认时，该岗位会列入“需人工检查”，不会被自动修改，也不会阻止其他唯一匹配项。
-扩展不做模糊匹配，不覆盖未知链接。文档版本无效或安全待更新项超过单批 200 个时，整批停止。
-
-链接直接使用飞书岗位标题块 ID 构造，不模拟“复制选区链接”或 `Command + K`，
-因此不需要剪贴板、飞书页面权限或 macOS 辅助功能权限。补链只修改 Portfolio
-岗位 Bullet 的链接，不修改岗位 JD、公司官网链接、评论或相邻块。
-已经存在的同文档 `#share-…` 选区链接会被视为有效并保留；已有外部链接、
-混合链接或无法确认目标的链接会列为人工项，不会被自动覆盖。
-
-## 正确写入验收标准
-
-新公司的 API 回读必须同时证明：
-
-- Portfolio 的 Callout 首位只有一个公司块，随后是所有岗位 Bullet。
-- “岗位JD整理”后的首家公司是根级 Heading 1，不嵌套在上一家公司中。
-- “公司介绍”和“开放岗位”是灰色 Heading 2。
-- 公司介绍内容位于 Callout 内。
-- 每个岗位标题是根级同级块；岗位正文位于紧随其后的 QuoteContainer 内。
-- 岗位序号、标题、地点、招聘类型、岗位数量和两个区域的岗位名全部一致。
-- 每条 Portfolio 岗位 Bullet 的链接精确指向同公司、同岗位的 JD 标题块。
-
-追加岗位时，还必须证明没有第二个同名公司块，岗位序号从现有最大序号加一，并且两个区域都追加在原公司分组末尾。
-
-## 部分成功或结果未知时
-
-扩展不会自动重试或撤销写入。
-
-- 显示“岗位 JD 区已确认写入”时，JD 已通过完整回读校验但 Portfolio 未完成；重新检查后，完全匹配的 `resume-new-company` 计划不会重复写 JD，只补 Portfolio。
-- “部分完成”“结果未知”或结构校验失败时，界面才会显示“打开正式文档检查”。“结果未知”表示写请求可能已经被服务器接受；不要再次点击写入，先人工确认。
-- “岗位 JD 校验失败”时，Portfolio 不会继续写入。按提示检查公司 Heading 1、Callout、岗位标题和 QuoteContainer。
-- 修复或确认后重新点击“检查并生成写入计划”，生成一份基于最新 revision 的计划。
-
-## Boss / 脉脉
-
-1. 打开 Boss 或脉脉职位发布页。
-2. 在侧栏选择对应平台，粘贴 JD 并解析。
-3. 检查字段后点击“填入当前页面”。
-4. 找不到字段时使用“诊断当前页面”或点击记录功能；最终发布仍由人工完成。
-
-飞书 OpenAPI 功能不修改 `src/lib/jdParser.js` 和 `src/content/formFiller.js`。构建前会校验这两个文件的基线哈希。
-
-## Outlook 新投递提醒
-
-该功能固定监控中国区 Outlook 网页版中 `recruiting@zhenfund.com` 邮箱的
-`个人投递（需提醒）` 文件夹，并把新个人投递发送到用户配置的四人飞书群。
-扩展会排除脉脉、猎聘、实习僧和 BOSS 直聘等已有服务端规则处理的平台来源。
-
-### 增强模式：正文和简历附件
-
-增强模式沿用原来的 GUI 监控方式，不调用 Microsoft Graph，也不需要 Client ID、Tenant ID、
-邮箱密码或公司 IT 授权。扩展只在已登录的 `partner.outlook.cn` 标签页中工作：发现新邮件后，
-定位并点击对应邮件行，核对阅读窗格中的主题，读取可见正文和附件下载入口，再使用当前网页
-登录状态下载简历。处理时 Outlook 页面会短暂打开新邮件，并可能把它标记为已读。
-
-飞书管理员仍需完成本 README“飞书应用配置”中的机器人能力、消息与文件权限，并把应用
-机器人加入目标私密群；普通自定义 Webhook 不能上传简历文件。
-
-扩展内配置步骤：
-
-1. 在 Chrome/Edge 中登录 <https://partner.outlook.cn/mail/>，切换到目标邮箱和文件夹。
-2. 打开扩展侧栏，选择“Outlook 提醒”。
-3. 在“提醒内容”中选择“正文 + 简历附件（推荐）”。
-4. 填写目标群的 `oc_...` 群 ID，确认排除规则并保存。
-5. 点击“发送测试提醒”；确认群内同时收到测试文件和成功卡片后，点击“建立基线并开启监控”。
-
-增强模式的测试提醒会发送一个很小的文本文件，用于确认机器人确实具备附件上传和群文件发送
-权限。新邮件触发后，扩展会发送一张包含发件人、主题、时间和正文的飞书卡片，再把 PDF、
-DOC、DOCX 简历作为文件消息发送。单文件上限 30 MB，单封邮件附件总量上限 60 MB；
-其他文件和内嵌图片不会上传。正文最多发送 12,000 字，超出时会在卡片中标注截断。
-
-正文和附件只在处理当前新邮件时保存在内存，不写入扩展持久化队列或诊断日志。扩展只持久化
-邮件行的页面标识、去重状态和发送进度。群成员应限制为确有招聘数据访问权限的同事。
-
-### 兼容模式：仅主题 Webhook
-
-如果暂时没有配置飞书应用机器人，可以继续使用原来的提醒方式：
-
-1. 在四人飞书群中添加“自定义机器人”，开启签名校验。
-2. 在 Chrome/Edge 中登录 <https://partner.outlook.cn/mail/>，切换到目标邮箱和文件夹。
-3. 打开扩展侧栏，选择“Outlook 提醒”。
-4. 在“提醒内容”中选择“仅主题提醒（兼容模式）”，填写机器人 Webhook 和签名密钥，确认排除规则并保存。
-5. 发送测试提醒；确认无误后点击“建立基线并开启监控”。
-
-首次开启只记录当前邮件作为历史基线，不发送旧邮件。之后页面变化会触发扫描，
-后台也会定期补扫。电脑休眠、浏览器关闭、Outlook 标签页关闭或登录失效时监控会暂停。
-兼容模式的 Webhook 与签名密钥只保存在当前浏览器的本地扩展存储中；提醒只包含发件人、
-邮箱、主题、时间和是否有附件。兼容模式不会点击邮件；增强模式会打开新邮件读取正文和附件，
-因此可能改变已读状态。两种模式都不会移动或删除邮件。
-
-## JD Skill 安装
-
-仓库同时包含 `skills/jd-skill`，用于把 JD 图片、截图或 OCR 文本整理成插件可解析的模板。
+安装独立技能到当前 Codex 用户目录：
 
 ```bash
 bash scripts/install-jd-skill.sh
 ```
 
-安装后重新打开 Codex 或新开会话，并使用 `$jd-skill`。
+安装后重启 Codex 或新开会话，然后使用 `$jd-skill`。Skill 可处理 JD 截图、图片和粘贴文本；扩展与 Skill 可单独使用。
 
-## 验证
+## 开发与发布
+
+需要 Node.js：
 
 ```bash
+npm ci
 npm test
 npm run build
 ```
 
-`npm run build` 会同时验证：
+`npm run build` 会生成 `dist/`，其中包含扩展侧栏、Boss／脉脉内容脚本及所需静态资源。加载 `dist/` 可在本地验收。
 
-- Boss/脉脉受保护文件哈希不变。
-- `dist/content.js` 和 `dist/outlook.js` 没有 ES module import。
-- manifest 不含剪贴板或 `debugger` 权限，也不包含飞书页面 content script；运行时只接受固定正式招聘文档。
-- 原生构建包含 `nativeMessaging`，用于飞书用户授权令牌交换和 Keychain 支持的应用机器人短期令牌，不参与 Outlook 页面定位或邮件内容解析。
-- Boss/脉脉 host 和 content-script matches 完整保留。
-- 后台构建包含全部飞书授权、检查、计划、写入、岗位链接维护和 Outlook 监控消息。
-- 构建后的 JavaScript 不包含硬编码飞书机器人 Webhook。
-
-## 回退
-
-稳定的 Boss/脉脉回退基线保存在分支 `codex/pre-feishu-openapi-baseline`。需要紧急停用飞书新功能时，在干净工作区执行：
+macOS 上生成同事分发包：
 
 ```bash
-git switch codex/pre-feishu-openapi-baseline
-npm install
-npm run build
+scripts/build-colleague-distribution.sh
 ```
 
-不要用 `git reset --hard` 覆盖同事的未提交修改。
+分发包包括扩展、`skills/jd-skill`、安装说明、版本信息和 SHA-256 校验清单。构建脚本会先运行测试、构建和包校验。
+
+## 项目结构
+
+- `src/sidepanel/`：平台选择、JD 编辑与字段填写界面。
+- `src/content/`：表单填充、页面诊断和点击记录。
+- `src/lib/jdParser.js`：粘贴 JD 的结构化解析。
+- `skills/jd-skill/`：可独立安装的 Codex Skill。
+- `scripts/install-jd-skill.sh`：安装 Skill。
+- `scripts/build-colleague-distribution.sh`：构建并校验 macOS 分发包。
+- `tests/`：解析、表单填充、权限清单、安装包和精简范围回归测试。

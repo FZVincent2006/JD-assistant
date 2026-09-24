@@ -1,57 +1,30 @@
-# Reduce Extension to Boss and Maimai Filling
+# Recruitment Extension Scope Reduction
 
-## Goal
+## Context
 
-Reduce the browser extension to JD parsing and assisted field filling for Boss
-and Maimai. The Feishu recruitment document format has changed and the existing
-writer can no longer safely maintain it. Outlook delivery monitoring is also no
-longer needed.
+The formal recruitment document format has changed, so the extension's existing writer is no longer applicable. Outlook reminders are also no longer part of the workflow.
 
-## Retained Features
+## Product Scope
 
-- JD parsing and browser-assisted field filling for Boss and Maimai.
-- The `jd-skill` installation script and its fixed JD text output format.
+The extension supports parsing a pasted JD and assisting with form entry on Boss and Maimai. It retains field editing, diagnostics, click recording, and Boss iframe fallback. Users review the populated form and publish it themselves.
 
-## Removed Surface
+The repository also retains `skills/jd-skill` as a standalone Codex Skill. Its output format and installation script remain unchanged.
 
-- The Feishu Document tab, parsing preview, authorization controls, write-plan
-  generation, document scanning, document writing, validation, and historical
-  Portfolio-link repair.
-- The Outlook reminder tab, mailbox scanning, notification queues, webhook and
-  application-bot delivery, and all candidate-mail parsing.
-- The native messaging helper, its Keychain App Secret storage, OAuth token
-  exchange, and all packaging/install scripts that exist solely for document
-  publishing.
-- The formal recruitment-document URL, Feishu document scopes, fixed OAuth
-  redirect handling, and documentation referring to document writes.
+## Architecture
 
-## Architecture Changes
-
-The side panel will expose only Boss and Maimai modes. The background service
-worker will be removed if it has no remaining responsibility. All Feishu
-document and Outlook modules, along with their associated tests, will be
-deleted. The manifest will retain only the permissions and host matches required
-for Boss and Maimai page filling.
-
-The macOS colleague installer, Native Messaging helper, and related distribution
-artifacts will be removed because the retained browser-only functionality does
-not need them. Release documentation will instead describe loading the packaged
-or locally built extension into Chrome or Edge.
-
-## Security and Privacy
-
-The reduced extension will not access Feishu or Outlook, request authentication,
-store secrets, scan email, or process candidate attachments. It will retain only
-the browser permissions necessary to access the active Boss or Maimai tab and
-fill the user-reviewed fields. The independent `jd-skill` remains in the
-repository and continues to be installable with `scripts/install-jd-skill.sh`.
+- Side panel platform state is limited to `boss` and `maimai`.
+- The extension has one content script for the recruiting platform hosts and no background service worker.
+- The manifest keeps `activeTab`, `scripting`, `sidePanel`, `tabs`, and `webNavigation`; the last is required for `webNavigation.getAllFrames()` used by Boss iframe fallback and diagnostics.
+- No document publishing, authentication, mail scanning, reminder delivery, or native helper code is packaged.
+- Distribution contains the extension, JD Skill source, user guide, version metadata, and checksums.
 
 ## Verification
 
-- Add focused tests proving the side panel exposes only Boss and Maimai and the
-  manifest contains no Feishu, Outlook, Native Messaging, download, identity,
-  storage, alarm, or notification capability.
-- Remove tests that cover deleted document-writing and Outlook behavior.
-- Run the complete Node test suite and production build.
-- Verify installation and release documentation describe only the retained
-  browser extension and the independent JD Skill.
+- Automated tests cover the two-platform UI, retained form filling and parsing, manifest permissions and hosts, distribution contents, and public documentation.
+- `npm test` and `npm run build` must pass.
+- The built extension must contain `dist/index.html`, `dist/content.js`, and static assets, with no background or mail-monitor bundle.
+- `scripts/install-jd-skill.sh` remains unchanged.
+
+## Release Boundary
+
+`distribution/release-channel.json` pins an already published artifact. After this change is published, maintainers must build and verify a new package and update the release channel. The existing pinned release does not include unreleased source changes.

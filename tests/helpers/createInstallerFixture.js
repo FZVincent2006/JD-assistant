@@ -75,7 +75,7 @@ export async function createInstallerFixture(options = {}) {
 
   await writeInnerChecksums(packageRoot);
   if (options.tamperInnerFile) {
-    await writeFile(path.join(packageRoot, "扩展/background.js"), "tampered\n", "utf8");
+    await writeFile(path.join(packageRoot, "扩展/content.js"), "tampered\n", "utf8");
   }
 
   await execFileAsync("/usr/bin/ditto", [
